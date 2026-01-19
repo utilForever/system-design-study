@@ -6,7 +6,11 @@
 
 This repository is dedicated to storing materials for a system design study group. The study group operates in seasons, with each season focusing on a selected book for study.
 
-- Season 1: TBA
+- Season 1: System Design Interview – An insider's guide by Alex Xu.
+
+- Season 2: System Design Interview – An Insider's Guide: Volume 2 by Alex Xu and Sahn Lam.
+
+- Season 3: TBA
 
 <img align="right" src="https://149753425.v2.pressablecdn.com/wp-content/uploads/2009/06/OSIApproved_100X125.png">
 
