@@ -6,7 +6,7 @@
 
 This repository is dedicated to storing materials for a system design study group. The study group operates in seasons, with each season focusing on a selected book for study.
 
-- Season 1: System Design Interview – An insider's guide by Alex Xu.
+- Season 1: [System Design Interview – An Insider's Guide by Alex Xu.](./Season%201/)
 
 - Season 2: System Design Interview – An Insider's Guide: Volume 2 by Alex Xu and Sahn Lam.
 
