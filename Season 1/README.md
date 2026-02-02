@@ -8,7 +8,17 @@ System design interviews are the most difficult to tackle of all technical inter
 
 ## Presenter
 
-TBA
+- Chris Ohk
+- Chankyu Shin
+- Donghyeon Yeo
+- Hyunwoo Jang
+- Juho Moon
+- Seungrok Lee
+- Sijun Seong
+- Taeyoung Yoo
+- Youngjun Kim
+- Yuhan Park
+- Yuseok Yang
 
 ## Contents (Presentation Slides - Korean)
 
