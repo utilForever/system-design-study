@@ -26,15 +26,15 @@ System design interviews are the most difficult to tackle of all technical inter
 
 ### Chapter 1: Scale from Zero to Millions of Users
 
-- Presenter: TBA
+- Presenter: Skipped.
 
 ### Chapter 2: Back-of-the-Envelope Estimations
 
-- Presenter: TBA
+- Presenter: Skipped.
 
 ### Chapter 3: A Framework for System Design Interviews
 
-- Presenter: TBA
+- Presenter: Skipped.
 
 ### Chapter 4: Design a Rate Limiter
 
