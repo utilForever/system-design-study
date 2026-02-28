@@ -38,7 +38,7 @@ System design interviews are the most difficult to tackle of all technical inter
 
 ### Chapter 4: Design a Rate Limiter
 
-- Presenter: TBA
+- Presenter: Youngjun Kim [[Summary]](./01%20-%20Summary/260228%20-%20System%20Design%20Interview%20–%20An%20Insider's%20Guide,%20Chapter%204.md)
 
 ### Chapter 5: Design Consistent Hashing
 
