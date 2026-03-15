@@ -1,0 +1,3762 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>분산 시스템에서 유일 ID 생성기 설계</title>
+  <style>
+    /* ─── CSS Custom Properties ───────────────────────────────────────── */
+    :root {
+      --bg: #f8f9fa;
+      --accent: #2563eb;
+      --green: #16a34a;
+      --red: #dc2626;
+      --yellow: #eab308;
+      --purple: #7c3aed;
+      --orange: #ea580c;
+      --gray: #6b7280;
+      --card-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+
+      --text-primary: #111827;
+      --text-secondary: #374151;
+      --text-muted: #6b7280;
+      --border: #e5e7eb;
+      --surface: #ffffff;
+      --transition: 0.5s ease;
+    }
+
+    /* ─── Reset ──────────────────────────────────────────────────────── */
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      color: var(--text-primary);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ─── Slide Container ─────────────────────────────────────────────── */
+    .slides-container {
+      display: flex;
+      width: 100vw;
+      height: 100vh;
+      transform: translateX(0);
+      transition: transform var(--transition);
+      will-change: transform;
+    }
+
+    /* ─── Individual Slide ────────────────────────────────────────────── */
+    .slide {
+      flex: 0 0 100vw;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg);
+      padding: 48px 64px;
+      position: relative;
+    }
+
+    /* ─── Utility: Card ───────────────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: var(--card-shadow);
+    }
+
+    /* ─── Utility: Card Grids ─────────────────────────────────────────── */
+    .card-grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+    }
+
+    .card-grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    .card-grid-4 {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+    }
+
+    /* ─── Utility: Pros / Cons ────────────────────────────────────────── */
+    .pros-cons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .pro-card {
+      background: #f0fdf4;
+      border-left: 4px solid var(--green);
+      border-radius: 8px;
+      padding: 16px 20px;
+    }
+
+    .con-card {
+      background: #fef2f2;
+      border-left: 4px solid var(--red);
+      border-radius: 8px;
+      padding: 16px 20px;
+    }
+
+    /* ─── Utility: Badge ──────────────────────────────────────────────── */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 10px;
+      border-radius: 9999px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      white-space: nowrap;
+    }
+
+    /* ─── Utility: Slide Title & Subtitle ─────────────────────────────── */
+    .slide-title {
+      font-size: clamp(1.75rem, 3.5vw, 2.75rem);
+      font-weight: 800;
+      color: var(--text-primary);
+      line-height: 1.15;
+      letter-spacing: -0.02em;
+    }
+
+    .slide-subtitle {
+      font-size: clamp(0.9rem, 1.8vw, 1.2rem);
+      font-weight: 500;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+
+    /* ─── Utility: Diagram Box ────────────────────────────────────────── */
+    .diagram-box {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      border: 2px solid var(--border);
+      border-radius: 10px;
+      background: var(--surface);
+      padding: 16px 24px;
+      box-shadow: var(--card-shadow);
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      gap: 6px;
+    }
+
+    /* ─── Utility: Diagram Arrow ──────────────────────────────────────── */
+    .diagram-arrow {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--gray);
+      font-size: 1.4rem;
+      line-height: 1;
+    }
+
+    /* ─── Utility: Highlight Number ───────────────────────────────────── */
+    .highlight-number {
+      font-size: clamp(2.5rem, 5vw, 4rem);
+      font-weight: 900;
+      color: var(--accent);
+      letter-spacing: -0.03em;
+      line-height: 1;
+    }
+
+    /* ─── Utility: Code Block ─────────────────────────────────────────── */
+    .code-block {
+      background: #1e293b;
+      color: #e2e8f0;
+      border-radius: 10px;
+      padding: 20px 24px;
+      font-family: 'SFMono-Regular', 'Consolas', 'Liberation Mono', monospace;
+      font-size: 0.85rem;
+      line-height: 1.7;
+      overflow-x: auto;
+      white-space: pre;
+    }
+
+    /* ─── Utility: Check Item ─────────────────────────────────────────── */
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: 0.95rem;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+
+    .check-item::before {
+      content: '✓';
+      flex-shrink: 0;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--green);
+      background: #dcfce7;
+      border-radius: 50%;
+      width: 22px;
+      height: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: 1px;
+    }
+
+    /* ─── Utility: Tag / Chip ─────────────────────────────────────────── */
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 12px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      gap: 4px;
+    }
+
+    /* ─── Slides 4-7 ─────────────────────────────────────────────────── */
+
+    /* ── Slide 4: 비교 테이블 ─────────────────────────────────────────── */
+    .s4-inner {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      width: 100%;
+      max-width: 1000px;
+    }
+
+    .s4-table-wrap {
+      width: 100%;
+      background: var(--surface);
+      border-radius: 12px;
+      box-shadow: var(--card-shadow);
+      overflow: hidden;
+    }
+
+    .s4-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+    }
+
+    .s4-table thead tr {
+      background: #1e293b;
+      color: #f1f5f9;
+    }
+
+    .s4-table th {
+      padding: 10px 12px;
+      font-weight: 700;
+      font-size: 0.78rem;
+      letter-spacing: 0.03em;
+      text-align: center;
+      border-right: 1px solid rgba(255,255,255,0.08);
+      white-space: nowrap;
+    }
+
+    .s4-table th:first-child {
+      text-align: left;
+      padding-left: 18px;
+    }
+
+    .s4-table tbody tr {
+      border-bottom: 1px solid var(--border);
+      transition: background 0.15s;
+    }
+
+    .s4-table tbody tr:last-child {
+      border-bottom: none;
+    }
+
+    .s4-table tbody tr:hover {
+      background: #f8fafc;
+    }
+
+    .s4-table td {
+      padding: 10px 12px;
+      text-align: center;
+      border-right: 1px solid var(--border);
+      font-size: 0.82rem;
+      line-height: 1;
+    }
+
+    .s4-table td:last-child,
+    .s4-table th:last-child {
+      border-right: none;
+    }
+
+    .s4-table td:first-child {
+      text-align: left;
+      padding-left: 18px;
+      font-weight: 700;
+      color: var(--text-primary);
+      white-space: nowrap;
+    }
+
+    /* Cell color-coding */
+    .td-yes  { background: #f0fdf4; }
+    .td-no   { background: #fef2f2; }
+
+    /* Snowflake row highlight */
+    .s4-row-snowflake {
+      background: #eff6ff;
+      border-left: 4px solid var(--accent);
+    }
+
+    .s4-row-snowflake:hover {
+      background: #dbeafe !important;
+    }
+
+    .s4-row-snowflake td:first-child {
+      color: var(--accent);
+    }
+
+    /* Conclusion bar */
+    .s4-conclusion {
+      background: linear-gradient(90deg, #1e40af 0%, #2563eb 100%);
+      color: #ffffff;
+      border-radius: 10px;
+      padding: 14px 22px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      text-align: center;
+    }
+
+    /* ── Slide 5: Multi-master ─────────────────────────────────────────── */
+    .s5-inner {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      width: 100%;
+      max-width: 860px;
+    }
+
+    .s5-diagram {
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      gap: 0;
+      padding: 20px 0 4px;
+    }
+
+    .s5-server-col {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .s5-server-box {
+      border: 2px solid var(--accent);
+      background: #eff6ff;
+      border-radius: 10px;
+      padding: 14px 24px;
+      text-align: center;
+      min-width: 150px;
+    }
+
+    .s5-server-box .s5-server-name {
+      font-size: 0.9rem;
+      font-weight: 800;
+      color: var(--accent);
+      margin-bottom: 6px;
+    }
+
+    .s5-server-box .s5-ids {
+      font-size: 0.82rem;
+      font-family: 'SFMono-Regular', 'Consolas', monospace;
+      color: var(--text-secondary);
+    }
+
+    .s5-k-label {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 20px;
+      gap: 8px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      padding-bottom: 36px;
+    }
+
+    .s5-k-badge {
+      background: #fef9c3;
+      border: 1px solid #eab308;
+      color: #854d0e;
+      border-radius: 6px;
+      padding: 3px 10px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .s5-webapp-box {
+      border: 2px solid #d1d5db;
+      background: var(--surface);
+      border-radius: 8px;
+      padding: 8px 18px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--text-secondary);
+      min-width: 110px;
+      text-align: center;
+    }
+
+    /* ── Slide 6: UUID ────────────────────────────────────────────────── */
+    .s6-inner {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      width: 100%;
+      max-width: 860px;
+    }
+
+    .s6-uuid-card {
+      background: #1e293b;
+      color: #7dd3fc;
+      border-radius: 12px;
+      padding: 18px 28px;
+      text-align: center;
+      font-family: 'SFMono-Regular', 'Consolas', 'Liberation Mono', monospace;
+      font-size: clamp(1rem, 2.2vw, 1.4rem);
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      box-shadow: var(--card-shadow);
+    }
+
+    .s6-uuid-label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: #64748b;
+      letter-spacing: 0.1em;
+      margin-bottom: 6px;
+      font-family: -apple-system, sans-serif;
+    }
+
+    .s6-diagram {
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      gap: 10px;
+      padding: 4px 0;
+    }
+
+    .s6-server-col {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .s6-server-box {
+      border: 2px solid var(--purple);
+      background: #f5f3ff;
+      border-radius: 10px;
+      padding: 10px 14px;
+      text-align: center;
+      min-width: 120px;
+    }
+
+    .s6-server-name {
+      font-size: 0.8rem;
+      font-weight: 800;
+      color: var(--purple);
+      margin-bottom: 4px;
+    }
+
+    .s6-gen-badge {
+      background: #ede9fe;
+      border: 1px solid #c4b5fd;
+      border-radius: 5px;
+      padding: 2px 7px;
+      font-size: 0.68rem;
+      font-weight: 700;
+      color: var(--purple);
+      white-space: nowrap;
+    }
+
+    .s6-sep-label {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      padding: 0 4px;
+      padding-top: 14px;
+    }
+
+    .s6-id-chip {
+      background: #ecfdf5;
+      border: 1px solid #6ee7b7;
+      border-radius: 6px;
+      padding: 3px 8px;
+      font-size: 0.68rem;
+      font-family: 'SFMono-Regular', monospace;
+      color: var(--green);
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .s6-diagram-label {
+      text-align: center;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-top: -4px;
+    }
+
+    /* ── Slide 7: Ticket Server ───────────────────────────────────────── */
+    .s7-inner {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      width: 100%;
+      max-width: 840px;
+    }
+
+    .s7-diagram {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 0;
+    }
+
+    .s7-web-row {
+      display: flex;
+      gap: 14px;
+      justify-content: center;
+    }
+
+    .s7-web-box {
+      border: 2px solid var(--border);
+      background: var(--surface);
+      border-radius: 8px;
+      padding: 10px 18px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--text-secondary);
+      text-align: center;
+      min-width: 90px;
+    }
+
+    .s7-arrows-row {
+      display: flex;
+      gap: 14px;
+      justify-content: center;
+    }
+
+    .s7-arrow {
+      font-size: 1.1rem;
+      color: var(--gray);
+      width: 90px;
+      text-align: center;
+      line-height: 1;
+    }
+
+    /* Converging arrows visual — single center */
+    .s7-convergence {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+    }
+
+    .s7-ticket-wrap {
+      position: relative;
+      display: inline-flex;
+    }
+
+    .s7-ticket-box {
+      border: 2px solid var(--orange);
+      background: #fff7ed;
+      border-radius: 12px;
+      padding: 14px 32px;
+      text-align: center;
+      min-width: 220px;
+    }
+
+    .s7-ticket-name {
+      font-size: 0.95rem;
+      font-weight: 800;
+      color: var(--orange);
+      margin-bottom: 4px;
+    }
+
+    .s7-ticket-sub {
+      font-size: 0.75rem;
+      font-family: 'SFMono-Regular', 'Consolas', monospace;
+      color: #9a3412;
+      background: #ffedd5;
+      border-radius: 4px;
+      padding: 2px 8px;
+      display: inline-block;
+      margin-bottom: 4px;
+    }
+
+    .s7-ticket-desc {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      font-style: italic;
+    }
+
+    .s7-spof-badge {
+      position: absolute;
+      top: -10px;
+      right: -12px;
+      background: var(--red);
+      color: #ffffff;
+      font-size: 0.68rem;
+      font-weight: 800;
+      padding: 3px 8px;
+      border-radius: 9999px;
+      letter-spacing: 0.04em;
+      white-space: nowrap;
+      box-shadow: 0 2px 6px rgba(220,38,38,0.4);
+    }
+
+    /* ─── Slide 8: Snowflake 소개 ────────────────────────────────────── */
+    .s8-inner {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      width: 100%;
+      max-width: 900px;
+    }
+
+    .s8-header {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .s8-badge {
+      display: inline-flex;
+      align-self: flex-start;
+      align-items: center;
+      gap: 6px;
+      background: linear-gradient(90deg, #1e40af 0%, #2563eb 100%);
+      color: #ffffff;
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      padding: 5px 14px;
+      border-radius: 9999px;
+      box-shadow: 0 2px 8px rgba(37,99,235,0.35);
+    }
+
+    .s8-highlight-cards {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    .s8-hcard {
+      background: var(--surface);
+      border-radius: 12px;
+      padding: 20px 20px 18px;
+      box-shadow: var(--card-shadow);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      border-top: 4px solid transparent;
+    }
+
+    .s8-hcard--blue   { border-top-color: var(--accent); }
+    .s8-hcard--green  { border-top-color: var(--green); }
+    .s8-hcard--purple { border-top-color: var(--purple); }
+
+    .s8-hcard-emoji {
+      font-size: 1.6rem;
+      line-height: 1;
+    }
+
+    .s8-hcard-title {
+      font-size: 0.95rem;
+      font-weight: 800;
+      color: var(--text-primary);
+      letter-spacing: -0.01em;
+    }
+
+    .s8-hcard-desc {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      line-height: 1.45;
+    }
+
+    .s8-checklist-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      background: var(--surface);
+      border-radius: 12px;
+      padding: 16px 22px;
+      box-shadow: var(--card-shadow);
+    }
+
+    .s8-checklist-label {
+      font-size: 0.78rem;
+      font-weight: 800;
+      color: var(--text-muted);
+      letter-spacing: 0.06em;
+      white-space: nowrap;
+      margin-right: 4px;
+    }
+
+    .s8-req-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: #f0fdf4;
+      border: 1.5px solid #86efac;
+      color: #15803d;
+      font-size: 0.8rem;
+      font-weight: 700;
+      padding: 5px 13px;
+      border-radius: 9999px;
+      white-space: nowrap;
+    }
+
+    /* ─── Slide 9: Snowflake 64비트 구조 ─────────────────────────────── */
+    .s9-inner {
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+      width: 100%;
+      max-width: 980px;
+    }
+
+    /* Bit layout bar */
+    .s9-bit-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      width: 90%;
+      margin: 0 auto;
+    }
+
+    /* Labels row above the bar */
+    .s9-labels-top {
+      display: grid;
+      grid-template-columns: 1fr 41fr 5fr 5fr 12fr;
+      width: 100%;
+    }
+
+    .s9-label-cell {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      padding: 0 2px 6px;
+    }
+
+    .s9-label-name {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--text-secondary);
+      white-space: nowrap;
+      letter-spacing: 0.01em;
+    }
+
+    .s9-label-bits {
+      font-size: 0.68rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+
+    /* The bar itself */
+    .s9-bit-bar {
+      display: grid;
+      grid-template-columns: 1fr 41fr 5fr 5fr 12fr;
+      width: 100%;
+      height: 52px;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+    }
+
+    .s9-seg {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ffffff;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .s9-seg::after {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 40%;
+      background: rgba(255,255,255,0.12);
+      pointer-events: none;
+    }
+
+    .s9-seg--sign      { background: var(--gray); }
+    .s9-seg--timestamp { background: var(--accent); }
+    .s9-seg--dc        { background: var(--purple); }
+    .s9-seg--machine   { background: var(--orange); }
+    .s9-seg--seq       { background: var(--green); }
+
+    /* Spec cards row */
+    .s9-spec-cards {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+    }
+
+    .s9-spec-card {
+      background: var(--surface);
+      border-radius: 10px;
+      padding: 14px 16px;
+      box-shadow: var(--card-shadow);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      border-left: 3px solid transparent;
+    }
+
+    .s9-spec-card--gray   { border-left-color: var(--gray); }
+    .s9-spec-card--blue   { border-left-color: var(--accent); }
+    .s9-spec-card--mixed  { border-left-color: var(--purple); }
+    .s9-spec-card--green  { border-left-color: var(--green); }
+
+    .s9-spec-title {
+      font-size: 0.78rem;
+      font-weight: 800;
+      color: var(--text-primary);
+      letter-spacing: -0.01em;
+    }
+
+    .s9-spec-sub {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      line-height: 1.35;
+    }
+
+    .s9-spec-note {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--accent);
+      margin-top: 2px;
+    }
+
+    .s9-spec-card--gray   .s9-spec-note { color: var(--gray); }
+    .s9-spec-card--blue   .s9-spec-note { color: var(--accent); }
+    .s9-spec-card--mixed  .s9-spec-note { color: var(--purple); }
+    .s9-spec-card--green  .s9-spec-note { color: var(--green); }
+
+    /* ─── Slide 10: ID 생성 프로세스 ─────────────────────────────────── */
+    .s10-inner {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      width: 100%;
+      max-width: 900px;
+    }
+
+    /* Step flow */
+    .s10-steps {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      background: var(--surface);
+      border-radius: 12px;
+      padding: 20px 24px;
+      box-shadow: var(--card-shadow);
+    }
+
+    .s10-step {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      flex: 1;
+      text-align: center;
+    }
+
+    .s10-step-circle {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: #ffffff;
+      font-size: 1.1rem;
+      font-weight: 900;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      box-shadow: 0 4px 12px rgba(37,99,235,0.35);
+    }
+
+    .s10-step:nth-child(1) .s10-step-circle { background: var(--accent); box-shadow: 0 4px 12px rgba(37,99,235,0.35); }
+    .s10-step:nth-child(3) .s10-step-circle { background: var(--purple); box-shadow: 0 4px 12px rgba(124,58,237,0.35); }
+    .s10-step:nth-child(5) .s10-step-circle { background: var(--green); box-shadow: 0 4px 12px rgba(22,163,74,0.35); }
+    .s10-step:nth-child(7) .s10-step-circle { background: var(--orange); box-shadow: 0 4px 12px rgba(234,88,12,0.35); }
+
+    .s10-step-title {
+      font-size: 0.82rem;
+      font-weight: 800;
+      color: var(--text-primary);
+      line-height: 1.3;
+    }
+
+    .s10-step-sub {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      line-height: 1.3;
+    }
+
+    .s10-step-arrow {
+      font-size: 1.4rem;
+      color: var(--border);
+      flex-shrink: 0;
+      padding: 0 4px;
+      margin-bottom: 28px;
+    }
+
+    /* Capacity stat cards */
+    .s10-stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    .s10-stat-card {
+      background: var(--surface);
+      border-radius: 12px;
+      padding: 18px 22px;
+      box-shadow: var(--card-shadow);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      border-top: 3px solid var(--accent);
+    }
+
+    .s10-stat-card:nth-child(2) {
+      border-top-color: var(--green);
+    }
+
+    .s10-stat-number {
+      font-size: clamp(2.2rem, 4vw, 3rem);
+      font-weight: 900;
+      color: var(--accent);
+      letter-spacing: -0.03em;
+      line-height: 1;
+    }
+
+    .s10-stat-card:nth-child(2) .s10-stat-number {
+      color: var(--green);
+    }
+
+    .s10-stat-label {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      font-weight: 500;
+      margin-top: 2px;
+    }
+
+    /* Code block for slide 10 */
+    .s10-code {
+      background: #1e293b;
+      border-radius: 10px;
+      padding: 16px 22px;
+      font-family: 'SFMono-Regular', 'Consolas', 'Liberation Mono', monospace;
+      font-size: 0.82rem;
+      line-height: 1.8;
+      overflow-x: auto;
+    }
+
+    .s10-code .co-comment { color: #64748b; }
+    .s10-code .co-var     { color: #7dd3fc; }
+    .s10-code .co-op      { color: #f472b6; }
+    .s10-code .co-num     { color: #fb923c; }
+
+    /* ─── Slide 9: 64비트 구조 Assembly Animation ────────────────────── */
+    .s9-seg {
+      transform-origin: left center;
+      transition: none;
+    }
+
+    .s9-label-cell {
+      transition: none;
+    }
+
+    /* Hidden state — applied on reset */
+    .s9-seg.s9-seg--hidden {
+      transform: scaleX(0);
+      opacity: 0;
+    }
+
+    .s9-label-cell.s9-label--hidden {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+
+    /* Reveal animation for each segment */
+    @keyframes s9SegReveal {
+      0%   { transform: scaleX(0); opacity: 0; }
+      60%  { transform: scaleX(1.04); opacity: 1; }
+      100% { transform: scaleX(1); opacity: 1; }
+    }
+
+    @keyframes s9LabelFadeUp {
+      0%   { opacity: 0; transform: translateY(8px); }
+      100% { opacity: 1; transform: translateY(0); }
+    }
+
+    .s9-seg.s9-seg--reveal {
+      animation: s9SegReveal 0.42s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    }
+
+    .s9-label-cell.s9-label--reveal {
+      animation: s9LabelFadeUp 0.32s ease-out forwards;
+    }
+
+    /* Spec cards — hidden/revealed */
+    .s9-spec-card.s9-card--hidden {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+
+    @keyframes s9CardFadeUp {
+      0%   { opacity: 0; transform: translateY(12px); }
+      100% { opacity: 1; transform: translateY(0); }
+    }
+
+    .s9-spec-card.s9-card--reveal {
+      animation: s9CardFadeUp 0.36s ease-out forwards;
+    }
+
+    /* Completion glow on the full bar */
+    @keyframes s9BarGlow {
+      0%   { box-shadow: 0 0 0 0 rgba(37,99,235,0); }
+      40%  { box-shadow: 0 0 0 6px rgba(37,99,235,0.18), 0 0 24px 2px rgba(37,99,235,0.1); }
+      100% { box-shadow: 0 0 0 0 rgba(37,99,235,0); }
+    }
+
+    .s9-bit-bar.s9-bar--glow {
+      animation: s9BarGlow 1.1s ease-out forwards;
+    }
+
+    /* ─── Slide 10: ID 생성 Animation ────────────────────────────────── */
+
+    /* Step dim/lit states */
+    .s10-step-circle {
+      transition: background 0.3s, box-shadow 0.3s, transform 0.3s;
+    }
+
+    .s10-step .s10-step-title,
+    .s10-step .s10-step-sub {
+      transition: color 0.3s, opacity 0.3s;
+    }
+
+    .s10-step.s10-step--dim .s10-step-circle {
+      background: #d1d5db !important;
+      box-shadow: none !important;
+    }
+
+    .s10-step.s10-step--dim .s10-step-title {
+      color: #9ca3af;
+    }
+
+    .s10-step.s10-step--dim .s10-step-sub {
+      opacity: 0.4;
+    }
+
+    @keyframes s10StepPulse {
+      0%   { transform: scale(1); }
+      40%  { transform: scale(1.18); }
+      70%  { transform: scale(0.96); }
+      100% { transform: scale(1); }
+    }
+
+    .s10-step.s10-step--active .s10-step-circle {
+      animation: s10StepPulse 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    }
+
+    /* Arrow glow travel */
+    .s10-step-arrow {
+      position: relative;
+    }
+
+    @keyframes s10ArrowGlow {
+      0%   { color: var(--border); text-shadow: none; }
+      50%  { color: var(--accent); text-shadow: 0 0 8px rgba(37,99,235,0.6); }
+      100% { color: var(--border); text-shadow: none; }
+    }
+
+    .s10-step-arrow.s10-arrow--glow {
+      animation: s10ArrowGlow 0.5s ease-in-out forwards;
+    }
+
+    /* Live counter display */
+    .s10-counter-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      padding: 4px 0 2px;
+    }
+
+    .s10-counter-label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .s10-counter-num {
+      font-family: 'SFMono-Regular', 'Consolas', monospace;
+      font-size: clamp(1.1rem, 2.4vw, 1.6rem);
+      font-weight: 900;
+      color: var(--accent);
+      letter-spacing: -0.02em;
+      min-width: 180px;
+      text-align: left;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .s10-counter-num.s10-counter--visible {
+      opacity: 1;
+    }
+
+    /* Stat card pulse */
+    @keyframes s10StatPulse {
+      0%   { transform: scale(1); box-shadow: var(--card-shadow); }
+      40%  { transform: scale(1.04); box-shadow: 0 0 0 4px rgba(37,99,235,0.18), var(--card-shadow); }
+      100% { transform: scale(1); box-shadow: var(--card-shadow); }
+    }
+
+    .s10-stat-card.s10-stat--pulse {
+      animation: s10StatPulse 0.6s ease-out forwards;
+    }
+
+    /* Code line highlight */
+    .s10-code-line {
+      display: block;
+      border-radius: 3px;
+      transition: background 0.25s;
+      padding: 0 4px;
+      margin: 0 -4px;
+    }
+
+    .s10-code-line.s10-line--highlight {
+      background: rgba(37,99,235,0.18);
+    }
+
+    /* ─── Slide 5: Multi-master Animation ────────────────────────────── */
+    .s5-anim-area {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 0 4px;
+    }
+
+    .s5-anim-label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .s5-id-track {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 36px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .s5-id-chip {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 900;
+      opacity: 0;
+      transform: scale(0.4) translateY(-12px);
+      transition: none;
+    }
+
+    .s5-id-chip.s5-chip--odd {
+      background: #eff6ff;
+      border: 2px solid var(--accent);
+      color: var(--accent);
+    }
+
+    .s5-id-chip.s5-chip--even {
+      background: #f0fdf4;
+      border: 2px solid var(--green);
+      color: var(--green);
+    }
+
+    .s5-id-chip.s5-chip-pop {
+      animation: s5ChipPop 0.38s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    }
+
+    @keyframes s5ChipPop {
+      0%   { opacity: 0; transform: scale(0.4) translateY(-12px); }
+      60%  { opacity: 1; transform: scale(1.15) translateY(0); }
+      100% { opacity: 1; transform: scale(1) translateY(0); }
+    }
+
+    .s5-server-box.s5-pulse-odd {
+      animation: s5PulseOdd 0.45s ease-out;
+    }
+
+    .s5-server-box.s5-pulse-even {
+      animation: s5PulseEven 0.45s ease-out;
+    }
+
+    @keyframes s5PulseOdd {
+      0%   { box-shadow: 0 0 0 0 rgba(37,99,235,0.6); background: #eff6ff; }
+      40%  { box-shadow: 0 0 0 10px rgba(37,99,235,0.2); background: #dbeafe; }
+      100% { box-shadow: 0 0 0 0 rgba(37,99,235,0); background: #eff6ff; }
+    }
+
+    @keyframes s5PulseEven {
+      0%   { box-shadow: 0 0 0 0 rgba(22,163,74,0.6); background: #f0fdf4; }
+      40%  { box-shadow: 0 0 0 10px rgba(22,163,74,0.2); background: #dcfce7; }
+      100% { box-shadow: 0 0 0 0 rgba(22,163,74,0); background: #f0fdf4; }
+    }
+
+    /* ─── Slide 7: Ticket Server Animation ───────────────────────────── */
+    .s7-anim-wrap {
+      position: relative;
+      width: 100%;
+    }
+
+    /* Request dots traveling from web servers to ticket server */
+    .s7-req-dot {
+      position: absolute;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 10;
+      opacity: 0;
+    }
+
+    .s7-req-dot--1 { background: var(--accent); }
+    .s7-req-dot--2 { background: var(--green); }
+    .s7-req-dot--3 { background: var(--purple); }
+
+    @keyframes s7DotTravel1 {
+      0%   { opacity: 1; transform: translate(0, 0); }
+      100% { opacity: 1; transform: translate(var(--tx1), var(--ty)); }
+    }
+
+    @keyframes s7DotTravel2 {
+      0%   { opacity: 1; transform: translate(0, 0); }
+      100% { opacity: 1; transform: translate(var(--tx2), var(--ty)); }
+    }
+
+    @keyframes s7DotTravel3 {
+      0%   { opacity: 1; transform: translate(0, 0); }
+      100% { opacity: 1; transform: translate(var(--tx3), var(--ty)); }
+    }
+
+    /* ID badge that flies back from ticket server to web server */
+    .s7-return-id {
+      position: absolute;
+      background: var(--orange);
+      color: #fff;
+      font-size: 0.65rem;
+      font-weight: 900;
+      padding: 2px 7px;
+      border-radius: 6px;
+      pointer-events: none;
+      z-index: 10;
+      opacity: 0;
+      white-space: nowrap;
+    }
+
+    /* Ticket server glow on receive */
+    .s7-ticket-box.s7-glow {
+      animation: s7TicketGlow 0.5s ease-out;
+    }
+
+    @keyframes s7TicketGlow {
+      0%   { box-shadow: 0 0 0 0 rgba(234,88,12,0.7); background: #fff7ed; }
+      35%  { box-shadow: 0 0 0 12px rgba(234,88,12,0.25); background: #ffedd5; }
+      100% { box-shadow: 0 0 0 0 rgba(234,88,12,0); background: #fff7ed; }
+    }
+
+    /* Ticket server SPOF down state */
+    .s7-ticket-box.s7-down {
+      background: #fef2f2 !important;
+      border-color: var(--red) !important;
+      animation: s7Down 0.3s ease-out forwards;
+    }
+
+    @keyframes s7Down {
+      0%   { transform: scale(1); }
+      30%  { transform: scale(0.96); }
+      100% { transform: scale(1); }
+    }
+
+    .s7-ticket-box.s7-recovering {
+      animation: s7Recover 0.4s ease-out forwards;
+    }
+
+    @keyframes s7Recover {
+      0%   { background: #fef2f2; border-color: var(--red); }
+      100% { background: #fff7ed; border-color: var(--orange); }
+    }
+
+    /* SPOF badge pulse */
+    .s7-spof-badge.s7-spof-pulse {
+      animation: s7SpofPulse 1.4s ease-in-out infinite;
+    }
+
+    @keyframes s7SpofPulse {
+      0%, 100% { box-shadow: 0 2px 6px rgba(220,38,38,0.4); transform: scale(1); }
+      50%       { box-shadow: 0 0 0 6px rgba(220,38,38,0.2); transform: scale(1.08); }
+    }
+
+    /* Error X marks on web boxes when ticket server is down */
+    .s7-web-box.s7-error::after {
+      content: '✗';
+      position: absolute;
+      top: -8px;
+      right: -8px;
+      width: 18px;
+      height: 18px;
+      background: var(--red);
+      color: #fff;
+      font-size: 0.6rem;
+      font-weight: 900;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 18px;
+      text-align: center;
+    }
+
+    .s7-web-box {
+      position: relative;
+      transition: background 0.3s, border-color 0.3s;
+    }
+
+    .s7-web-box.s7-error {
+      background: #fef2f2;
+      border-color: var(--red);
+    }
+
+    /* ─── Placeholder slide content ──────────────────────────────────── */
+    .slide-placeholder {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      text-align: center;
+    }
+
+    .slide-placeholder .slide-number-label {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--accent);
+      background: #eff6ff;
+      border-radius: 8px;
+      padding: 4px 14px;
+      letter-spacing: 0.05em;
+    }
+
+    .slide-placeholder .slide-name {
+      font-size: clamp(1.4rem, 3vw, 2.2rem);
+      font-weight: 800;
+      color: var(--text-primary);
+      letter-spacing: -0.02em;
+    }
+
+    /* ─── Navigation: Dot Indicators ─────────────────────────────────── */
+    #nav-dots {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(0,0,0,0.07);
+      border-radius: 9999px;
+      padding: 8px 16px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+      z-index: 1000;
+    }
+
+    .nav-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--border);
+      cursor: pointer;
+      border: none;
+      padding: 0;
+      transition: background 0.25s, transform 0.25s;
+      flex-shrink: 0;
+    }
+
+    .nav-dot:hover {
+      background: #93c5fd;
+      transform: scale(1.2);
+    }
+
+    .nav-dot.active {
+      background: var(--accent);
+      transform: scale(1.3);
+    }
+
+    /* ─── Navigation: Slide Number ────────────────────────────────────── */
+    #slide-number {
+      position: fixed;
+      bottom: 24px;
+      right: 28px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(0,0,0,0.07);
+      border-radius: 8px;
+      padding: 6px 14px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      z-index: 1000;
+      letter-spacing: 0.04em;
+    }
+
+    /* ─── Click-zone hints (invisible, semantic) ──────────────────────── */
+    .click-zone-prev,
+    .click-zone-next {
+      position: fixed;
+      top: 0;
+      height: 100vh;
+      width: 30vw;
+      z-index: 500;
+      cursor: pointer;
+    }
+
+    .click-zone-prev { left: 0; }
+    .click-zone-next { right: 0; }
+
+    /* ─── Slide 1: 타이틀 ────────────────────────────────────────────── */
+    .s1-inner {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 28px;
+      text-align: center;
+      width: 100%;
+      max-width: 900px;
+    }
+
+    .s1-title {
+      font-size: clamp(1.6rem, 3.2vw, 2.6rem);
+      background: linear-gradient(135deg, var(--accent) 0%, var(--purple) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .s1-subtitle {
+      font-size: clamp(0.9rem, 1.6vw, 1.15rem);
+      color: var(--text-muted);
+      letter-spacing: 0.04em;
+    }
+
+    .s1-tags {
+      width: 100%;
+      margin-top: 8px;
+    }
+
+    .s1-kw {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 20px 16px;
+      border-radius: 14px;
+      color: #ffffff;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+    }
+
+    .s1-kw--blue   { background: var(--accent); }
+    .s1-kw--green  { background: var(--green); }
+    .s1-kw--purple { background: var(--purple); }
+    .s1-kw--orange { background: var(--orange); }
+
+    .s1-kw-emoji {
+      font-size: 2rem;
+      line-height: 1;
+    }
+
+    .s1-kw-label {
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+
+    /* ─── Slide 2: 문제 정의 ─────────────────────────────────────────── */
+    .s2-inner {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      width: 100%;
+      max-width: 960px;
+    }
+
+    .s2-title {
+      font-size: clamp(1.4rem, 2.8vw, 2.1rem);
+      margin-bottom: 2px;
+    }
+
+    .s2-compare {
+      width: 100%;
+    }
+
+    .s2-col {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      padding: 0;
+      overflow: hidden;
+    }
+
+    .s2-col-header {
+      font-size: 1rem;
+      font-weight: 800;
+      padding: 10px 20px;
+      color: #ffffff;
+      letter-spacing: 0.03em;
+    }
+
+    .s2-col-header--red   { background: var(--red);   border-top: 4px solid #b91c1c; }
+    .s2-col-header--green { background: var(--green); border-top: 4px solid #15803d; }
+
+    .s2-diagram {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      padding: 12px 20px;
+    }
+
+    .s2-db-box,
+    .s2-web-box {
+      width: 160px;
+      text-align: center;
+    }
+
+    .s2-box-label {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .s2-box-sub {
+      font-size: 0.72rem;
+      color: var(--accent);
+      font-family: 'SFMono-Regular', 'Consolas', monospace;
+      background: #eff6ff;
+      border-radius: 4px;
+      padding: 1px 6px;
+    }
+
+    .s2-limits {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 0 20px 16px;
+    }
+
+    .s2-limit-item {
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      padding-left: 18px;
+      position: relative;
+      line-height: 1.4;
+    }
+
+    .s2-limit-item::before {
+      content: '✗';
+      position: absolute;
+      left: 0;
+      color: var(--red);
+      font-weight: 700;
+    }
+
+    .s2-diagram--distributed {
+      gap: 10px;
+      padding: 12px 20px 8px;
+    }
+
+    .s2-server-row {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+    }
+
+    .s2-srv-box {
+      font-size: 0.75rem;
+      padding: 10px 14px;
+      min-width: 80px;
+      text-align: center;
+    }
+
+    .s2-question-mark {
+      font-size: 2.6rem;
+      font-weight: 900;
+      color: var(--accent);
+      line-height: 1;
+      opacity: 0.85;
+    }
+
+    .s2-dist-label {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-align: center;
+    }
+
+    .s2-challenges {
+      width: 100%;
+    }
+
+    .s2-ch {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      padding: 16px 12px;
+      text-align: center;
+      border-top: 3px solid var(--border);
+    }
+
+    .s2-ch:nth-child(1) { border-top-color: var(--accent); }
+    .s2-ch:nth-child(2) { border-top-color: var(--green); }
+    .s2-ch:nth-child(3) { border-top-color: var(--purple); }
+    .s2-ch:nth-child(4) { border-top-color: var(--orange); }
+
+    .s2-ch-icon {
+      font-size: 1.4rem;
+      line-height: 1;
+    }
+
+    .s2-ch-title {
+      font-size: 0.9rem;
+      font-weight: 800;
+      color: var(--text-primary);
+    }
+
+    .s2-ch-desc {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      line-height: 1.3;
+    }
+
+    /* ─── Slide 3: 요구사항 ──────────────────────────────────────────── */
+    .s3-inner {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+      width: 100%;
+      max-width: 880px;
+    }
+
+    .s3-title {
+      font-size: clamp(1.4rem, 2.8vw, 2.1rem);
+    }
+
+    .s3-cols {
+      width: 100%;
+    }
+
+    .s3-req-card {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+
+    .s3-req-header {
+      font-size: 0.95rem;
+      font-weight: 800;
+      padding: 12px 22px;
+      color: #ffffff;
+      letter-spacing: 0.03em;
+    }
+
+    .s3-req-header--blue   { background: var(--accent); }
+    .s3-req-header--purple { background: var(--purple); }
+
+    .s3-checklist {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 20px 22px;
+    }
+
+    /* ─── Slide 11: 추가 고려사항 & 실사례 ──────────────────────────── */
+    .s11-inner {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      width: 100%;
+      max-width: 980px;
+    }
+
+    .s11-title {
+      font-size: clamp(1.4rem, 2.8vw, 2.1rem);
+    }
+
+    /* Consideration cards row */
+    .s11-considerations {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    .s11-consider-card {
+      background: var(--surface);
+      border-radius: 12px;
+      padding: 20px 20px 18px;
+      box-shadow: var(--card-shadow);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      border-top: 4px solid transparent;
+    }
+
+    .s11-consider-card--blue   { border-top-color: var(--accent); }
+    .s11-consider-card--purple { border-top-color: var(--purple); }
+    .s11-consider-card--green  { border-top-color: var(--green); }
+
+    .s11-consider-emoji {
+      font-size: 1.4rem;
+      line-height: 1;
+      margin-bottom: 2px;
+    }
+
+    .s11-consider-title {
+      font-size: 0.92rem;
+      font-weight: 800;
+      color: var(--text-primary);
+      letter-spacing: -0.01em;
+    }
+
+    .s11-consider-item {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      line-height: 1.45;
+      padding-left: 10px;
+      position: relative;
+    }
+
+    .s11-consider-item::before {
+      content: '·';
+      position: absolute;
+      left: 0;
+      color: var(--text-muted);
+      font-weight: 700;
+    }
+
+    .s11-consider-code {
+      display: inline-block;
+      margin-top: 4px;
+      font-family: 'SFMono-Regular', 'Consolas', 'Liberation Mono', monospace;
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: #0f766e;
+      background: #f0fdfa;
+      border: 1px solid #99f6e4;
+      border-radius: 4px;
+      padding: 2px 8px;
+      white-space: nowrap;
+    }
+
+    /* Real-world companies section */
+    .s11-companies-section {
+      background: var(--surface);
+      border-radius: 12px;
+      padding: 18px 22px;
+      box-shadow: var(--card-shadow);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .s11-companies-label {
+      font-size: 0.75rem;
+      font-weight: 800;
+      color: var(--text-muted);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .s11-companies-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+    }
+
+    .s11-company-card {
+      border-radius: 10px;
+      padding: 14px 16px;
+      border-left: 4px solid transparent;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .s11-company-card--blue   { border-left-color: var(--accent);  background: #eff6ff; }
+    .s11-company-card--purple { border-left-color: #5865F2;        background: #eef0ff; }
+    .s11-company-card--orange { border-left-color: var(--orange);  background: #fff7ed; }
+    .s11-company-card--dark   { border-left-color: #374151;        background: #f9fafb; }
+
+    .s11-company-name {
+      font-size: 1.05rem;
+      font-weight: 800;
+      color: var(--text-primary);
+      letter-spacing: -0.02em;
+      line-height: 1;
+    }
+
+    .s11-company-card--blue   .s11-company-name { color: var(--accent); }
+    .s11-company-card--purple .s11-company-name { color: #5865F2; }
+    .s11-company-card--orange .s11-company-name { color: var(--orange); }
+    .s11-company-card--dark   .s11-company-name { color: #374151; }
+
+    .s11-company-desc {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      line-height: 1.35;
+    }
+
+    /* ─── Slide 12: 핵심 인사이트 & Q&A ─────────────────────────────── */
+    .s12-inner {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      width: 100%;
+      max-width: 940px;
+    }
+
+    .s12-title {
+      font-size: clamp(1.4rem, 2.8vw, 2.1rem);
+    }
+
+    /* Principle cards with solid colored backgrounds */
+    .s12-principles {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    .s12-principle-card {
+      border-radius: 12px;
+      padding: 20px 20px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      color: #ffffff;
+    }
+
+    .s12-principle-card--blue   { background: var(--accent);  box-shadow: 0 4px 16px rgba(37,99,235,0.3); }
+    .s12-principle-card--green  { background: var(--green);   box-shadow: 0 4px 16px rgba(22,163,74,0.3); }
+    .s12-principle-card--purple { background: var(--purple);  box-shadow: 0 4px 16px rgba(124,58,237,0.3); }
+
+    .s12-principle-emoji {
+      font-size: 1.5rem;
+      line-height: 1;
+    }
+
+    .s12-principle-title {
+      font-size: 0.95rem;
+      font-weight: 800;
+      letter-spacing: -0.01em;
+    }
+
+    .s12-principle-desc {
+      font-size: 0.78rem;
+      line-height: 1.5;
+      opacity: 0.88;
+    }
+
+    /* Discussion box */
+    .s12-discussion {
+      background: #fffbeb;
+      border: 1.5px solid #fcd34d;
+      border-left: 5px solid var(--yellow);
+      border-radius: 12px;
+      padding: 18px 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .s12-discussion-title {
+      font-size: 0.9rem;
+      font-weight: 800;
+      color: #92400e;
+      letter-spacing: -0.01em;
+    }
+
+    .s12-questions {
+      list-style: none;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px 24px;
+    }
+
+    .s12-question-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      background: #ffffff;
+      border: 1px solid #fde68a;
+      border-radius: 8px;
+      padding: 10px 14px;
+      cursor: pointer;
+      transition: box-shadow 0.18s, border-color 0.18s, transform 0.15s;
+    }
+
+    .s12-question-item:hover {
+      box-shadow: 0 3px 12px rgba(234,179,8,0.22);
+      border-color: var(--yellow);
+      transform: translateY(-1px);
+    }
+
+    .s12-question-num {
+      flex-shrink: 0;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: var(--yellow);
+      color: #ffffff;
+      font-size: 0.72rem;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: 1px;
+    }
+
+    .s12-question-text {
+      font-size: 0.83rem;
+      color: var(--text-secondary);
+      line-height: 1.4;
+      font-weight: 500;
+    }
+
+    /* Footer thanks */
+    .s12-footer {
+      text-align: center;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      letter-spacing: 0.04em;
+      margin-top: 2px;
+    }
+
+    /* ─── Slide 2 (NEW): 인터뷰 프레임워크 ──────────────────────── */
+    .s2new-inner {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      width: 100%;
+      max-width: 940px;
+    }
+
+    .s2new-title {
+      font-size: clamp(1.4rem, 2.8vw, 2.1rem);
+    }
+
+    .s2new-steps {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+    }
+
+    .s2new-step {
+      background: var(--surface);
+      border-radius: 12px;
+      padding: 18px 16px;
+      box-shadow: var(--card-shadow);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      text-align: center;
+      border-top: 4px solid transparent;
+    }
+
+    .s2new-step:nth-child(1) { border-top-color: var(--accent); }
+    .s2new-step:nth-child(2) { border-top-color: var(--green); }
+    .s2new-step:nth-child(3) { border-top-color: var(--purple); }
+    .s2new-step:nth-child(4) { border-top-color: var(--orange); }
+
+    .s2new-step-num {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      color: #fff;
+      font-size: 0.9rem;
+      font-weight: 900;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .s2new-step:nth-child(1) .s2new-step-num { background: var(--accent); }
+    .s2new-step:nth-child(2) .s2new-step-num { background: var(--green); }
+    .s2new-step:nth-child(3) .s2new-step-num { background: var(--purple); }
+    .s2new-step:nth-child(4) .s2new-step-num { background: var(--orange); }
+
+    .s2new-step-title {
+      font-size: 0.9rem;
+      font-weight: 800;
+      color: var(--text-primary);
+    }
+
+    .s2new-step-desc {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    .s2new-dialog {
+      background: var(--surface);
+      border-radius: 12px;
+      padding: 20px 24px;
+      box-shadow: var(--card-shadow);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .s2new-dialog-title {
+      font-size: 0.82rem;
+      font-weight: 800;
+      color: var(--text-muted);
+      letter-spacing: 0.06em;
+    }
+
+    .s2new-dialog-row {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      font-size: 0.85rem;
+      line-height: 1.5;
+    }
+
+    .s2new-dialog-role {
+      font-weight: 800;
+      white-space: nowrap;
+      flex-shrink: 0;
+      min-width: 70px;
+    }
+
+    .s2new-dialog-role--c { color: var(--accent); }
+    .s2new-dialog-role--i { color: var(--green); }
+
+    .s2new-dialog-text {
+      color: var(--text-secondary);
+    }
+
+    .s2new-note {
+      background: #eff6ff;
+      border-left: 4px solid var(--accent);
+      border-radius: 8px;
+      padding: 12px 18px;
+      font-size: 0.82rem;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+
+    /* ─── Slide 12 (NEW): 타임스탬프 변환 워크스루 ──────────────── */
+    .s12new-inner {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      width: 100%;
+      max-width: 900px;
+    }
+
+    .s12new-title {
+      font-size: clamp(1.4rem, 2.8vw, 2.1rem);
+    }
+
+    .s12new-flow {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+      background: var(--surface);
+      border-radius: 12px;
+      padding: 24px 28px;
+      box-shadow: var(--card-shadow);
+    }
+
+    .s12new-flow-step {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      width: 100%;
+    }
+
+    .s12new-flow-label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      letter-spacing: 0.04em;
+    }
+
+    .s12new-flow-value {
+      font-family: 'SFMono-Regular', 'Consolas', 'Liberation Mono', monospace;
+      font-size: clamp(0.85rem, 1.8vw, 1.15rem);
+      font-weight: 700;
+      padding: 8px 20px;
+      border-radius: 8px;
+      text-align: center;
+      max-width: 100%;
+      overflow-x: auto;
+    }
+
+    .s12new-flow-value--binary {
+      background: #1e293b;
+      color: #e2e8f0;
+      font-size: clamp(0.65rem, 1.2vw, 0.82rem);
+      letter-spacing: 0.04em;
+    }
+
+    .s12new-flow-value--binary .s12new-ts { color: #60a5fa; }
+    .s12new-flow-value--binary .s12new-dc { color: #a78bfa; }
+    .s12new-flow-value--binary .s12new-mc { color: #fb923c; }
+    .s12new-flow-value--binary .s12new-sq { color: #4ade80; }
+    .s12new-flow-value--binary .s12new-sign { color: #9ca3af; }
+
+    .s12new-flow-value--decimal {
+      background: #eff6ff;
+      color: var(--accent);
+    }
+
+    .s12new-flow-value--epoch {
+      background: #f5f3ff;
+      color: var(--purple);
+    }
+
+    .s12new-flow-value--utc {
+      background: #f0fdf4;
+      color: var(--green);
+      font-size: clamp(1rem, 2vw, 1.3rem);
+    }
+
+    .s12new-flow-arrow {
+      font-size: 1.2rem;
+      color: var(--gray);
+      padding: 4px 0;
+    }
+
+    .s12new-flow-op {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      background: var(--bg);
+      border-radius: 6px;
+      padding: 2px 10px;
+    }
+
+    .s12new-code {
+      background: #1e293b;
+      color: #e2e8f0;
+      border-radius: 10px;
+      padding: 16px 22px;
+      font-family: 'SFMono-Regular', 'Consolas', 'Liberation Mono', monospace;
+      font-size: 0.82rem;
+      line-height: 1.7;
+      white-space: pre;
+    }
+
+    .s12new-code .co-comment { color: #64748b; }
+    .s12new-code .co-var { color: #7dd3fc; }
+    .s12new-code .co-op { color: #f472b6; }
+    .s12new-code .co-num { color: #fb923c; }
+
+    .s12new-note {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      text-align: center;
+      line-height: 1.4;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Click navigation zones -->
+  <div class="click-zone-prev" id="zone-prev" aria-label="이전 슬라이드"></div>
+  <div class="click-zone-next" id="zone-next" aria-label="다음 슬라이드"></div>
+
+  <!-- Slide container -->
+  <div class="slides-container" id="slides-container">
+
+    <!-- Slide 1: 타이틀 -->
+    <section class="slide" id="slide-1">
+      <div class="s1-inner">
+        <h1 class="slide-title s1-title">분산 시스템에서 유일 ID 생성기 설계</h1>
+        <p class="slide-subtitle s1-subtitle">System Design Interview — Chapter 7</p>
+        <div class="card-grid-4 s1-tags">
+          <div class="card s1-kw s1-kw--blue">
+            <span class="s1-kw-emoji">🔄</span>
+            <span class="s1-kw-label">확장성</span>
+          </div>
+          <div class="card s1-kw s1-kw--green">
+            <span class="s1-kw-emoji">🔑</span>
+            <span class="s1-kw-label">유일성</span>
+          </div>
+          <div class="card s1-kw s1-kw--purple">
+            <span class="s1-kw-emoji">⚡</span>
+            <span class="s1-kw-label">가용성</span>
+          </div>
+          <div class="card s1-kw s1-kw--orange">
+            <span class="s1-kw-emoji">🚀</span>
+            <span class="s1-kw-label">성능</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Slide 2: 인터뷰 접근 프레임워크 (NEW) -->
+    <section class="slide" id="slide-2">
+      <div class="s2new-inner">
+        <h2 class="slide-title s2new-title">인터뷰 접근 프레임워크</h2>
+        <div class="s2new-steps">
+          <div class="s2new-step">
+            <div class="s2new-step-num">1</div>
+            <div class="s2new-step-title">문제 이해</div>
+            <div class="s2new-step-desc">요구사항 명확화<br>질문으로 범위 확정</div>
+          </div>
+          <div class="s2new-step">
+            <div class="s2new-step-num">2</div>
+            <div class="s2new-step-title">고수준 설계</div>
+            <div class="s2new-step-desc">4가지 방안 제시<br>장단점 비교</div>
+          </div>
+          <div class="s2new-step">
+            <div class="s2new-step-num">3</div>
+            <div class="s2new-step-title">상세 설계</div>
+            <div class="s2new-step-desc">Snowflake 채택<br>64비트 구조 설계</div>
+          </div>
+          <div class="s2new-step">
+            <div class="s2new-step-num">4</div>
+            <div class="s2new-step-title">마무리</div>
+            <div class="s2new-step-desc">추가 논점 제시<br>시계 동기화, 튜닝</div>
+          </div>
+        </div>
+        <div class="s2new-dialog">
+          <div class="s2new-dialog-title">CANDIDATE — INTERVIEWER 대화</div>
+          <div class="s2new-dialog-row">
+            <span class="s2new-dialog-role s2new-dialog-role--c">Candidate</span>
+            <span class="s2new-dialog-text">unique ID의 특성이 뭔가요?</span>
+          </div>
+          <div class="s2new-dialog-row">
+            <span class="s2new-dialog-role s2new-dialog-role--i">Interviewer</span>
+            <span class="s2new-dialog-text">유일하고 정렬 가능해야 합니다.</span>
+          </div>
+          <div class="s2new-dialog-row">
+            <span class="s2new-dialog-role s2new-dialog-role--c">Candidate</span>
+            <span class="s2new-dialog-text">ID는 1씩 증가해야 하나요?</span>
+          </div>
+          <div class="s2new-dialog-row">
+            <span class="s2new-dialog-role s2new-dialog-role--i">Interviewer</span>
+            <span class="s2new-dialog-text">시간순이지만 반드시 1씩은 아닙니다. 저녁에 만든 ID가 아침 ID보다 크면 됩니다.</span>
+          </div>
+          <div class="s2new-dialog-row">
+            <span class="s2new-dialog-role s2new-dialog-role--c">Candidate</span>
+            <span class="s2new-dialog-text">숫자만 포함하나요? ID 길이 제한은?</span>
+          </div>
+          <div class="s2new-dialog-row">
+            <span class="s2new-dialog-role s2new-dialog-role--i">Interviewer</span>
+            <span class="s2new-dialog-text">네, 숫자만. 64비트에 맞아야 합니다. 초당 10,000개 생성 가능해야 합니다.</span>
+          </div>
+        </div>
+        <div class="s2new-note">
+          <strong>핵심:</strong> 면접에서는 바로 설계에 들어가지 말고, 질문을 통해 요구사항을 명확히 하는 것이 중요합니다.
+        </div>
+      </div>
+    </section>
+
+    <!-- Slide 3: 문제 정의 -->
+    <section class="slide" id="slide-3">
+      <div class="s2-inner">
+        <h2 class="slide-title s2-title">왜 분산 ID가 필요한가?</h2>
+        <div class="card-grid-2 s2-compare">
+          <!-- Left: 단일 DB -->
+          <div class="card s2-col s2-col--left">
+            <div class="s2-col-header s2-col-header--red">단일 DB</div>
+            <div class="s2-diagram s2-diagram--single">
+              <div class="diagram-box s2-db-box">
+                <span class="s2-box-label">DB Server</span>
+                <code class="s2-box-sub">auto_increment</code>
+              </div>
+              <div class="diagram-arrow">↓</div>
+              <div class="diagram-box s2-web-box">
+                <span class="s2-box-label">Web Server</span>
+              </div>
+            </div>
+            <ul class="s2-limits">
+              <li class="s2-limit-item">단일 서버 용량 한계</li>
+              <li class="s2-limit-item">분산 환경에서 ID 중복</li>
+              <li class="s2-limit-item">서버 간 동기화 문제</li>
+            </ul>
+          </div>
+          <!-- Right: 분산 시스템 -->
+          <div class="card s2-col s2-col--right">
+            <div class="s2-col-header s2-col-header--green">분산 시스템</div>
+            <div class="s2-diagram s2-diagram--distributed">
+              <div class="s2-server-row">
+                <div class="diagram-box s2-srv-box">Server 1</div>
+                <div class="diagram-box s2-srv-box">Server 2</div>
+                <div class="diagram-box s2-srv-box">Server 3</div>
+              </div>
+              <div class="s2-question-mark">?</div>
+              <p class="s2-dist-label">어떻게 유일한 ID를 생성할 것인가?</p>
+              <div style="margin-top:8px;font-size:0.7rem;color:var(--text-muted);text-align:center;line-height:1.5;">
+                실제 ID 예시 (Figure 7-1)<br>
+                <code style="font-size:0.65rem;letter-spacing:0.02em;">1227238262110117894</code><br>
+                <code style="font-size:0.65rem;letter-spacing:0.02em;">1243643959492173824</code><br>
+                <code style="font-size:0.65rem;letter-spacing:0.02em;">1567981766075453440</code>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- Challenge cards -->
+        <div class="card-grid-4 s2-challenges">
+          <div class="card s2-ch">
+            <div class="s2-ch-icon">📈</div>
+            <div class="s2-ch-title">확장성</div>
+            <div class="s2-ch-desc">초당 수천 개 ID 생성</div>
+          </div>
+          <div class="card s2-ch">
+            <div class="s2-ch-icon">🔑</div>
+            <div class="s2-ch-title">유일성</div>
+            <div class="s2-ch-desc">절대 중복 없음</div>
+          </div>
+          <div class="card s2-ch">
+            <div class="s2-ch-icon">🛡️</div>
+            <div class="s2-ch-title">가용성</div>
+            <div class="s2-ch-desc">장애에도 지속</div>
+          </div>
+          <div class="card s2-ch">
+            <div class="s2-ch-icon">⚡</div>
+            <div class="s2-ch-title">성능</div>
+            <div class="s2-ch-desc">최소 지연시간</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Slide 4: 요구사항 -->
+    <section class="slide" id="slide-4">
+      <div class="s3-inner">
+        <h2 class="slide-title s3-title">요구사항 정의</h2>
+        <div class="card-grid-2 s3-cols">
+          <!-- Left: 기능적 요구사항 -->
+          <div class="card s3-req-card">
+            <div class="s3-req-header s3-req-header--blue">기능적 요구사항</div>
+            <ul class="s3-checklist">
+              <li class="check-item">유일성: ID는 전역적으로 유일해야 함</li>
+              <li class="check-item">숫자형: 숫자만 포함</li>
+              <li class="check-item">64비트: 64비트 크기 제한</li>
+              <li class="check-item">시간순 정렬: 생성 시간에 따른 정렬 가능</li>
+              <li class="check-item">고성능: 초당 10,000개 이상 생성</li>
+            </ul>
+          </div>
+          <!-- Right: 비기능적 요구사항 -->
+          <div class="card s3-req-card">
+            <div class="s3-req-header s3-req-header--purple">비기능적 요구사항</div>
+            <ul class="s3-checklist">
+              <li class="check-item">고가용성: mission-critical 시스템 <span style="font-size:0.75em;color:#94a3b8;">(Step 4)</span></li>
+              <li class="check-item">Clock 동기화: NTP 등 고려 <span style="font-size:0.75em;color:#94a3b8;">(Step 4)</span></li>
+              <li class="check-item">섹션 길이 튜닝: 용도별 비트 조정 <span style="font-size:0.75em;color:#94a3b8;">(Step 4)</span></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Slide 4: 4가지 방법 비교 -->
+    <section class="slide" id="slide-5">
+      <div class="s4-inner">
+        <h2 class="slide-title">4가지 해결 방법 비교</h2>
+        <div class="s4-table-wrap">
+          <table class="s4-table" aria-label="4가지 ID 생성 방법 비교 표">
+            <thead>
+              <tr>
+                <th>방법</th>
+                <th>유일성</th>
+                <th>64비트</th>
+                <th>숫자형</th>
+                <th>시간순</th>
+                <th>성능</th>
+                <th>확장성</th>
+                <th>추천도</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Multi-master</td>
+                <td class="td-yes">✅</td>
+                <td class="td-yes">✅</td>
+                <td class="td-yes">✅</td>
+                <td class="td-no">❌</td>
+                <td>⭐⭐⭐</td>
+                <td>⭐⭐</td>
+                <td>🔴</td>
+              </tr>
+              <tr>
+                <td>UUID</td>
+                <td class="td-yes">✅</td>
+                <td class="td-no">❌</td>
+                <td class="td-no">❌</td>
+                <td class="td-no">❌</td>
+                <td>⭐⭐⭐⭐</td>
+                <td>⭐⭐⭐⭐⭐</td>
+                <td>🔴</td>
+              </tr>
+              <tr>
+                <td>Ticket Server</td>
+                <td class="td-yes">✅</td>
+                <td class="td-yes">✅</td>
+                <td class="td-yes">✅</td>
+                <td style="background:#fffbeb;">🟡</td>
+                <td>⭐⭐</td>
+                <td>⭐</td>
+                <td>🟡</td>
+              </tr>
+              <tr class="s4-row-snowflake">
+                <td>Snowflake</td>
+                <td class="td-yes">✅</td>
+                <td class="td-yes">✅</td>
+                <td class="td-yes">✅</td>
+                <td class="td-yes">✅</td>
+                <td>⭐⭐⭐⭐⭐</td>
+                <td>⭐⭐⭐⭐⭐</td>
+                <td>🟢</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p style="font-size:0.65rem;color:#94a3b8;text-align:right;margin:4px 0 0;">※ 성능·확장성 별점과 추천도는 편집 해석입니다</p>
+        <div class="s4-conclusion">→ Snowflake가 모든 요구사항을 충족하는 유일한 방법</div>
+      </div>
+    </section>
+
+    <!-- Slide 5: Multi-master Replication -->
+    <section class="slide" id="slide-6">
+      <div class="s5-inner">
+        <h2 class="slide-title">방법 1: Multi-master Replication</h2>
+        <p style="font-size:0.82rem;color:var(--text-secondary);text-align:center;margin-bottom:12px;line-height:1.6;">
+          DB의 <code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;font-size:0.78rem;">auto_increment</code>를 활용하되, <strong>1 대신 k(서버 수)만큼 증가</strong>시킨다.<br>
+          서버가 2대이면 하나는 홀수(1,3,5…), 다른 하나는 짝수(2,4,6…)를 생성한다.
+        </p>
+        <!-- Diagram -->
+        <div class="card" style="padding: 20px 28px;">
+          <div class="s5-diagram">
+            <!-- Server 1 col -->
+            <div class="s5-server-col">
+              <div class="s5-server-box" id="s5-server1">
+                <div class="s5-server-name">Server 1</div>
+                <div class="s5-ids">홀수: 1, 3, 5…</div>
+              </div>
+              <div class="diagram-arrow">↓</div>
+              <div class="s5-webapp-box">Web App 1</div>
+            </div>
+            <!-- Center label -->
+            <div class="s5-k-label">
+              <div class="s5-k-badge">k만큼 증가</div>
+            </div>
+            <!-- Server 2 col -->
+            <div class="s5-server-col">
+              <div class="s5-server-box" id="s5-server2">
+                <div class="s5-server-name">Server 2</div>
+                <div class="s5-ids">짝수: 2, 4, 6…</div>
+              </div>
+              <div class="diagram-arrow">↓</div>
+              <div class="s5-webapp-box">Web App 2</div>
+            </div>
+          </div>
+          <!-- Animation results area -->
+          <div class="s5-anim-area">
+            <div class="s5-anim-label">생성된 ID</div>
+            <div class="s5-id-track" id="s5-id-track"></div>
+          </div>
+        </div>
+        <!-- Pros / Cons -->
+        <div class="pros-cons">
+          <div class="pro-card">
+            <p style="font-size:0.82rem;font-weight:800;color:var(--green);margin-bottom:10px;">장점 👍</p>
+            <div class="check-item" style="margin-bottom:8px;">DB auto_increment 기능 활용</div>
+            <div class="check-item" style="margin-bottom:8px;">서버 수만큼 ID 확장 가능</div>
+            <div class="check-item">일부 확장성 문제 해결</div>
+          </div>
+          <div class="con-card">
+            <p style="font-size:0.82rem;font-weight:800;color:var(--red);margin-bottom:10px;">단점 👎</p>
+            <ul style="list-style:none;display:flex;flex-direction:column;gap:6px;">
+              <li style="font-size:0.84rem;color:var(--text-secondary);padding-left:16px;position:relative;">
+                <span style="position:absolute;left:0;color:var(--red);font-weight:700;">✗</span>여러 데이터 센터 확장 어려움
+              </li>
+              <li style="font-size:0.84rem;color:var(--text-secondary);padding-left:16px;position:relative;">
+                <span style="position:absolute;left:0;color:var(--red);font-weight:700;">✗</span>시간순 ID 증가 보장 안됨
+              </li>
+              <li style="font-size:0.84rem;color:var(--text-secondary);padding-left:16px;position:relative;">
+                <span style="position:absolute;left:0;color:var(--red);font-weight:700;">✗</span>서버 추가/제거 시 k값 변경 필요 → 확장 어려움
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Slide 7: UUID -->
+    <section class="slide" id="slide-7">
+      <div class="s6-inner">
+        <h2 class="slide-title">방법 2: UUID</h2>
+        <p style="font-size:0.82rem;color:var(--text-secondary);text-align:center;margin-bottom:10px;line-height:1.6;">
+          128비트 고유 식별자. <strong>서버 간 조율 없이 독립적으로 생성</strong>할 수 있다.<br>
+          Wikipedia: "10억 개/초로 100년간 생성해도 충돌 확률 50% 미만"
+        </p>
+        <!-- UUID example -->
+        <div class="s6-uuid-card">
+          <div class="s6-uuid-label">UUID 예시</div>
+          09c93e62-50b4-468d-bf8a-c07e1040bfb2
+        </div>
+        <!-- Diagram -->
+        <div class="card" style="padding: 16px 24px 12px;">
+          <div class="s6-diagram">
+            <div class="s6-server-col">
+              <div class="s6-server-box">
+                <div class="s6-server-name">Web 1</div>
+                <div class="s6-gen-badge">UUID Gen</div>
+              </div>
+              <div class="diagram-arrow">↓</div>
+              <div class="s6-id-chip">uuid-xxxx…</div>
+            </div>
+            <div class="s6-sep-label">각 서버가<br>독립적으로 생성</div>
+            <div class="s6-server-col">
+              <div class="s6-server-box">
+                <div class="s6-server-name">Web 2</div>
+                <div class="s6-gen-badge">UUID Gen</div>
+              </div>
+              <div class="diagram-arrow">↓</div>
+              <div class="s6-id-chip">uuid-yyyy…</div>
+            </div>
+            <div class="s6-sep-label"></div>
+            <div class="s6-server-col">
+              <div class="s6-server-box">
+                <div class="s6-server-name">Web 3</div>
+                <div class="s6-gen-badge">UUID Gen</div>
+              </div>
+              <div class="diagram-arrow">↓</div>
+              <div class="s6-id-chip">uuid-zzzz…</div>
+            </div>
+          </div>
+        </div>
+        <!-- Pros / Cons -->
+        <div class="pros-cons">
+          <div class="pro-card">
+            <p style="font-size:0.82rem;font-weight:800;color:var(--green);margin-bottom:10px;">장점 👍</p>
+            <div class="check-item" style="margin-bottom:8px;">생성이 간단함</div>
+            <div class="check-item" style="margin-bottom:8px;">서버 간 조율 불필요</div>
+            <div class="check-item">매우 쉬운 확장</div>
+          </div>
+          <div class="con-card">
+            <p style="font-size:0.82rem;font-weight:800;color:var(--red);margin-bottom:10px;">단점 👎</p>
+            <ul style="list-style:none;display:flex;flex-direction:column;gap:6px;">
+              <li style="font-size:0.84rem;color:var(--text-secondary);padding-left:16px;position:relative;">
+                <span style="position:absolute;left:0;color:var(--red);font-weight:700;">✗</span>128비트 (요구: 64비트)
+              </li>
+              <li style="font-size:0.84rem;color:var(--text-secondary);padding-left:16px;position:relative;">
+                <span style="position:absolute;left:0;color:var(--red);font-weight:700;">✗</span>시간순 증가 안됨
+              </li>
+              <li style="font-size:0.84rem;color:var(--text-secondary);padding-left:16px;position:relative;">
+                <span style="position:absolute;left:0;color:var(--red);font-weight:700;">✗</span>숫자 외 값 포함
+              </li>
+            </ul>
+          </div>
+        </div>
+        <p style="font-size:0.68rem;color:#94a3b8;text-align:center;margin-top:6px;">참고: UUID v1은 타임스탬프 기반이지만 비트 배치가 비순차적이라 시간순 정렬이 보장되지 않음. v4는 완전 랜덤.</p>
+      </div>
+    </section>
+
+    <!-- Slide 8: Ticket Server -->
+    <section class="slide" id="slide-8">
+      <div class="s7-inner">
+        <h2 class="slide-title">방법 3: Ticket Server</h2>
+        <p style="font-size:0.82rem;color:var(--text-secondary);text-align:center;margin-bottom:12px;line-height:1.6;">
+          <strong>중앙화된 단일 DB 서버</strong>의 <code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;font-size:0.78rem;">auto_increment</code>로 유일한 ID를 발급한다.<br>
+          Flickr가 분산 primary key 생성을 위해 개발한 방식이다.
+        </p>
+        <!-- Diagram -->
+        <div class="card" style="padding: 20px 28px 16px;">
+          <div class="s7-diagram" id="s7-diagram">
+            <!-- Web servers row -->
+            <div class="s7-web-row" id="s7-web-row">
+              <div class="s7-web-box" id="s7-web1">Web 1</div>
+              <div class="s7-web-box" id="s7-web2">Web 2</div>
+              <div class="s7-web-box" id="s7-web3">Web 3</div>
+            </div>
+            <!-- Arrows converging -->
+            <div class="s7-arrows-row">
+              <div class="s7-arrow">↘</div>
+              <div class="s7-arrow">↓</div>
+              <div class="s7-arrow">↙</div>
+            </div>
+            <!-- Ticket Server -->
+            <div class="s7-ticket-wrap" id="s7-ticket-wrap">
+              <div class="s7-ticket-box" id="s7-ticket-box">
+                <div class="s7-ticket-name">Ticket Server (DB)</div>
+                <div class="s7-ticket-sub">auto_increment</div>
+                <div class="s7-ticket-desc">Flickr에서 개발</div>
+              </div>
+              <span class="s7-spof-badge" id="s7-spof-badge">⚠ SPOF</span>
+            </div>
+          </div>
+        </div>
+        <!-- Pros / Cons -->
+        <div class="pros-cons">
+          <div class="pro-card">
+            <p style="font-size:0.82rem;font-weight:800;color:var(--green);margin-bottom:10px;">장점 👍</p>
+            <div class="check-item" style="margin-bottom:8px;">숫자형 ID 생성</div>
+            <div class="check-item" style="margin-bottom:8px;">구현이 쉬움</div>
+            <div class="check-item">중소규모에 적합</div>
+          </div>
+          <div class="con-card">
+            <p style="font-size:0.82rem;font-weight:800;color:var(--red);margin-bottom:10px;">단점 👎</p>
+            <ul style="list-style:none;display:flex;flex-direction:column;gap:6px;">
+              <li style="font-size:0.84rem;color:var(--text-secondary);padding-left:16px;position:relative;">
+                <span style="position:absolute;left:0;color:var(--red);font-weight:700;">✗</span>단일 장애 지점 (SPOF) — 서버 다운 시 전체 영향
+              </li>
+              <li style="font-size:0.84rem;color:var(--text-secondary);padding-left:16px;position:relative;">
+                <span style="position:absolute;left:0;color:var(--red);font-weight:700;">✗</span>SPOF 회피 위해 다중 서버 → 데이터 동기화 문제 발생
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Slide 8: Snowflake 소개 -->
+    <section class="slide" id="slide-9">
+      <div class="s8-inner">
+        <div class="s8-header">
+          <h2 class="slide-title">최종 선택: Twitter Snowflake</h2>
+          <span class="s8-badge">모든 요구사항을 만족하는 유일한 방안</span>
+        </div>
+        <p style="font-size:0.82rem;color:var(--text-secondary);text-align:center;margin-bottom:10px;line-height:1.6;">
+          앞선 방법들은 각각 한계가 있었다: <strong>Multi-master</strong>는 시간순 정렬 불가,
+          <strong>UUID</strong>는 128비트·비숫자형, <strong>Ticket Server</strong>는 SPOF.<br>
+          이 모든 요구사항을 만족하는 새로운 접근이 필요하다 — Twitter가 개발한 <strong>Snowflake</strong>는<br>
+          <strong>"분할 정복"</strong> 전략으로 64비트 ID를 여러 섹션으로 나누고,
+          각 머신이 <strong>DB 조회 없이 메모리에서 독립적으로</strong> ID를 생성한다.
+        </p>
+
+        <!-- 3 highlight cards -->
+        <div class="s8-highlight-cards">
+          <div class="s8-hcard s8-hcard--blue">
+            <div class="s8-hcard-emoji">🧩</div>
+            <div class="s8-hcard-title">분할 정복</div>
+            <div class="s8-hcard-desc">64비트 ID를 여러 섹션으로 분할</div>
+          </div>
+          <div class="s8-hcard s8-hcard--green">
+            <div class="s8-hcard-emoji">⏰</div>
+            <div class="s8-hcard-title">타임스탬프 기반</div>
+            <div class="s8-hcard-desc">시간순 정렬 보장</div>
+          </div>
+          <div class="s8-hcard s8-hcard--purple">
+            <div class="s8-hcard-emoji">🌐</div>
+            <div class="s8-hcard-title">분산 생성</div>
+            <div class="s8-hcard-desc">각 머신이 독립적으로 생성</div>
+          </div>
+          <div class="s8-hcard s8-hcard--blue">
+            <div class="s8-hcard-emoji">⚡</div>
+            <div class="s8-hcard-title">고성능</div>
+            <div class="s8-hcard-desc">데이터베이스 조회 없이 메모리에서 생성</div>
+          </div>
+        </div>
+
+        <!-- Requirements checklist row -->
+        <div class="s8-checklist-row">
+          <span class="s8-checklist-label">요구사항 충족</span>
+          <span class="s8-req-badge">✅ 유일성</span>
+          <span class="s8-req-badge">✅ 64비트</span>
+          <span class="s8-req-badge">✅ 숫자형</span>
+          <span class="s8-req-badge">✅ 시간순</span>
+          <span class="s8-req-badge">✅ 고성능</span>
+          <span class="s8-req-badge">✅ 확장성</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Slide 9: Snowflake 64비트 구조 -->
+    <section class="slide" id="slide-10">
+      <div class="s9-inner">
+        <h2 class="slide-title">64비트 ID 구조</h2>
+
+        <!-- Bit layout diagram -->
+        <div class="s9-bit-wrap">
+          <!-- Labels above bar -->
+          <div class="s9-labels-top">
+            <div class="s9-label-cell">
+              <span class="s9-label-name">Sign</span>
+              <span class="s9-label-bits">1 bit</span>
+            </div>
+            <div class="s9-label-cell">
+              <span class="s9-label-name">Timestamp</span>
+              <span class="s9-label-bits">41 bits</span>
+            </div>
+            <div class="s9-label-cell">
+              <span class="s9-label-name">Datacenter</span>
+              <span class="s9-label-bits">5 bits</span>
+            </div>
+            <div class="s9-label-cell">
+              <span class="s9-label-name">Machine</span>
+              <span class="s9-label-bits">5 bits</span>
+            </div>
+            <div class="s9-label-cell">
+              <span class="s9-label-name">Sequence</span>
+              <span class="s9-label-bits">12 bits</span>
+            </div>
+          </div>
+          <!-- Proportional color bar -->
+          <div class="s9-bit-bar" role="img" aria-label="Snowflake 64비트 구조: Sign 1비트, Timestamp 41비트, Datacenter 5비트, Machine 5비트, Sequence 12비트">
+            <div class="s9-seg s9-seg--sign" title="Sign: 1 bit"></div>
+            <div class="s9-seg s9-seg--timestamp" title="Timestamp: 41 bits">41</div>
+            <div class="s9-seg s9-seg--dc" title="Datacenter ID: 5 bits">5</div>
+            <div class="s9-seg s9-seg--machine" title="Machine ID: 5 bits">5</div>
+            <div class="s9-seg s9-seg--seq" title="Sequence: 12 bits">12</div>
+          </div>
+        </div>
+
+        <!-- Spec cards -->
+        <div class="s9-spec-cards">
+          <div class="s9-spec-card s9-spec-card--gray">
+            <div class="s9-spec-title">Sign (1)</div>
+            <div class="s9-spec-sub">부호 비트 (항상 0)</div>
+            <div class="s9-spec-note">미래 확장용 예약</div>
+          </div>
+          <div class="s9-spec-card s9-spec-card--blue">
+            <div class="s9-spec-title">Timestamp (41)</div>
+            <div class="s9-spec-sub">커스텀 에포크 이후 밀리초</div>
+            <div class="s9-spec-note">Twitter epoch: 1288834974657 = 2010-11-04 01:42:54 UTC<br>
+              <span style="font-size:0.7em;color:#94a3b8;">2<sup>41</sup>−1 = 2,199,023,255,551ms ÷1000÷60÷60÷24÷365 ≈ <strong>69.7년</strong></span><br>
+              <span style="font-size:0.7em;color:#94a3b8;">epoch를 오늘에 가깝게 설정할수록 오버플로우 시점이 늦춰짐</span></div>
+          </div>
+          <div class="s9-spec-card s9-spec-card--mixed">
+            <div class="s9-spec-title">Datacenter (5) + Machine (5)</div>
+            <div class="s9-spec-sub">위치 식별자</div>
+            <div class="s9-spec-note">32 × 32 = 1,024대</div>
+          </div>
+          <div class="s9-spec-card s9-spec-card--green">
+            <div class="s9-spec-title">Sequence (12)</div>
+            <div class="s9-spec-sub">밀리초당 시퀀스</div>
+            <div class="s9-spec-note">밀리초당 최대 4,096개<br><span style="font-size:0.7em;color:#94a3b8;">같은 ms에 1개만 생성 시 0 유지 · 초과 시 다음 ms 대기</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Slide 11: ID 생성 프로세스 -->
+    <section class="slide" id="slide-11">
+      <div class="s10-inner">
+        <h2 class="slide-title">ID 생성 과정</h2>
+
+        <!-- Step flow -->
+        <div class="s10-steps" id="s10-steps">
+          <div class="s10-step" id="s10-step-1">
+            <div class="s10-step-circle">1</div>
+            <div class="s10-step-title">현재 타임스탬프 획득</div>
+            <div class="s10-step-sub">밀리초 단위</div>
+          </div>
+          <div class="s10-step-arrow" id="s10-arrow-1">→</div>
+          <div class="s10-step" id="s10-step-2">
+            <div class="s10-step-circle">2</div>
+            <div class="s10-step-title">데이터센터/머신 ID 조합</div>
+            <div class="s10-step-sub">시작 시 고정</div>
+          </div>
+          <div class="s10-step-arrow" id="s10-arrow-2">→</div>
+          <div class="s10-step" id="s10-step-3">
+            <div class="s10-step-circle">3</div>
+            <div class="s10-step-title">시퀀스 번호 할당</div>
+            <div class="s10-step-sub">매 ms마다 0으로 리셋<br>같은 ms 내에서만 증가</div>
+          </div>
+          <div class="s10-step-arrow" id="s10-arrow-3">→</div>
+          <div class="s10-step" id="s10-step-4">
+            <div class="s10-step-circle">4</div>
+            <div class="s10-step-title">비트 시프트로 64비트 조합</div>
+            <div class="s10-step-sub">최종 ID 생성</div>
+          </div>
+        </div>
+
+        <!-- Sequence overflow note -->
+        <p style="font-size:0.78rem;color:var(--text-secondary);text-align:center;margin:8px 0 4px;line-height:1.5;max-width:700px;margin-left:auto;margin-right:auto;">
+          <strong>시퀀스 오버플로우:</strong> 같은 밀리초에 4,096개(2<sup>12</sup>)를 초과하면 다음 밀리초까지 대기한다.<br>
+          <strong>DC/Machine ID</strong>는 시작 시 고정되며 런타임 중 변경하면 ID 충돌이 발생할 수 있다.
+        </p>
+
+        <!-- Live counter -->
+        <div class="s10-counter-wrap">
+          <span class="s10-counter-label">생성된 ID</span>
+          <span class="s10-counter-num" id="s10-counter">0</span>
+        </div>
+
+        <!-- Capacity stats -->
+        <div class="s10-stats">
+          <div class="s10-stat-card" id="s10-stat-1">
+            <div class="s10-stat-number">4,096</div>
+            <div class="s10-stat-label">밀리초당 생성 가능</div>
+          </div>
+          <div class="s10-stat-card" id="s10-stat-2">
+            <div class="s10-stat-number">~409만</div>
+            <div class="s10-stat-label">초당 생성 가능 (단일 머신)</div>
+          </div>
+        </div>
+
+        <!-- Code snippet -->
+        <div class="s10-code" id="s10-code">
+<span class="s10-code-line" id="s10-line-1"><span class="co-var">id</span> <span class="co-op">=</span> <span class="co-op">(</span><span class="co-var">timestamp</span> <span class="co-op">-</span> <span class="co-var">epoch</span><span class="co-op">)</span> <span class="co-op">&lt;&lt;</span> <span class="co-num">22</span></span>
+<span class="s10-code-line" id="s10-line-2">   <span class="co-op">|</span> <span class="co-var">datacenter_id</span>           <span class="co-op">&lt;&lt;</span> <span class="co-num">17</span></span>
+<span class="s10-code-line" id="s10-line-3">   <span class="co-op">|</span> <span class="co-var">machine_id</span>              <span class="co-op">&lt;&lt;</span> <span class="co-num">12</span></span>
+<span class="s10-code-line" id="s10-line-4">   <span class="co-op">|</span> <span class="co-var">sequence</span></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Slide 12: 타임스탬프 변환 워크스루 (NEW) -->
+    <section class="slide" id="slide-12">
+      <div class="s12new-inner">
+        <h2 class="slide-title s12new-title">ID에서 시간 추출하기</h2>
+        <div class="s12new-flow">
+          <div class="s12new-flow-step">
+            <div class="s12new-flow-label">64비트 ID (이진수)</div>
+            <div class="s12new-flow-value s12new-flow-value--binary"><span class="s12new-sign">0</span>-<span class="s12new-ts">00100010101001011010011011000101101011000</span>-<span class="s12new-dc">01010</span>-<span class="s12new-mc">01100</span>-<span class="s12new-sq">000000000000</span></div>
+          </div>
+          <div class="s12new-flow-arrow">↓</div>
+          <div class="s12new-flow-op">타임스탬프 비트 추출 (>> 22)</div>
+          <div class="s12new-flow-step">
+            <div class="s12new-flow-label">타임스탬프 (십진수)</div>
+            <div class="s12new-flow-value s12new-flow-value--decimal">297,616,116,568</div>
+          </div>
+          <div class="s12new-flow-arrow">↓</div>
+          <div class="s12new-flow-op">+ Twitter epoch (1288834974657)</div>
+          <div class="s12new-flow-step">
+            <div class="s12new-flow-label">Unix 타임스탬프 (ms)</div>
+            <div class="s12new-flow-value s12new-flow-value--epoch">1,586,451,091,225</div>
+          </div>
+          <div class="s12new-flow-arrow">↓</div>
+          <div class="s12new-flow-op">밀리초 → UTC 변환</div>
+          <div class="s12new-flow-step">
+            <div class="s12new-flow-label">UTC 시간</div>
+            <div class="s12new-flow-value s12new-flow-value--utc">2020-04-09 16:51:31 UTC</div>
+          </div>
+        </div>
+        <div class="s12new-code"><span class="co-comment"># ID에서 타임스탬프 추출</span>
+<span class="co-var">timestamp</span> <span class="co-op">=</span> (<span class="co-var">id</span> <span class="co-op">>></span> <span class="co-num">22</span>) <span class="co-op">+</span> <span class="co-var">TWITTER_EPOCH</span>
+<span class="co-var">utc_time</span> <span class="co-op">=</span> <span class="co-var">datetime</span>.<span class="co-var">utcfromtimestamp</span>(<span class="co-var">timestamp</span> <span class="co-op">/</span> <span class="co-num">1000</span>)</div>
+        <div style="background:#f8fafc;border-radius:8px;padding:10px 16px;font-size:0.75rem;color:var(--text-secondary);line-height:1.6;max-width:700px;margin:8px auto 0;">
+          <strong style="color:var(--text-primary);">전체 필드 분해 예시</strong><br>
+          <span style="color:#9ca3af;">Sign:</span> <code>0</code> → 양수 (미래 확장용 예약)<br>
+          <span style="color:#60a5fa;">Timestamp:</span> <code>297,616,116,568</code> → +epoch = 2020-04-09 16:51:31 UTC<br>
+          <span style="color:#a78bfa;">Datacenter:</span> <code>01010</code> → DC #10<br>
+          <span style="color:#fb923c;">Machine:</span> <code>01100</code> → Machine #12<br>
+          <span style="color:#4ade80;">Sequence:</span> <code>000000000000</code> → 해당 ms의 첫 번째 ID (seq=0)
+        </div>
+        <p class="s12new-note">커스텀 epoch를 오늘 날짜에 가깝게 설정하면 오버플로우 시점을 최대한 늦출 수 있다</p>
+      </div>
+    </section>
+
+    <!-- Slide 13: 추가 고려사항 & 실사례 -->
+    <section class="slide" id="slide-13">
+      <div class="s11-inner">
+        <h2 class="slide-title s11-title">추가 고려사항 &amp; 실사례</h2>
+
+        <!-- 3 consideration cards -->
+        <div class="s11-considerations">
+          <div class="s11-consider-card s11-consider-card--blue">
+            <div class="s11-consider-emoji">🕐</div>
+            <div class="s11-consider-title">시계 동기화</div>
+            <p class="s11-consider-item">서버 간 시계 불일치 → ID 순서 문제</p>
+            <p class="s11-consider-item">해결: NTP (Network Time Protocol)</p>
+            <code class="s11-consider-code">ntpdate -s time.nist.gov</code>
+            <p class="s11-consider-item" style="margin-top:6px;font-size:0.75rem;color:var(--text-muted);">멀티 코어/멀티 머신 환경에서 모든 서버가 동일한 시간을 갖는다고 가정하지만 항상 참이 아닐 수 있음</p>
+            <p class="s11-consider-item" style="font-size:0.75rem;color:var(--text-muted);">시계 역행 감지 시 에러를 반환하거나 이전 타임스탬프를 유지하는 방어 로직 필요</p>
+          </div>
+          <div class="s11-consider-card s11-consider-card--purple">
+            <div class="s11-consider-emoji">🎛️</div>
+            <div class="s11-consider-title">섹션 길이 튜닝</div>
+            <p class="s11-consider-item">저동시성 + 장기간 → 타임스탬프 비트 ↑</p>
+            <p class="s11-consider-item">고동시성 + 단기간 → 시퀀스 비트 ↑</p>
+            <p class="s11-consider-item">필요에 따라 비트 할당 조정</p>
+            <table style="width:100%;font-size:0.68rem;border-collapse:collapse;margin-top:6px;">
+              <tr style="color:var(--text-muted);border-bottom:1px solid #e2e8f0;">
+                <th style="text-align:left;padding:2px 4px;">구성</th>
+                <th style="text-align:center;padding:2px 4px;">수명</th>
+                <th style="text-align:center;padding:2px 4px;">DC×머신</th>
+                <th style="text-align:center;padding:2px 4px;">시퀀스/ms</th>
+              </tr>
+              <tr style="color:var(--text-secondary);">
+                <td style="padding:2px 4px;">기본 41-5-5-12</td>
+                <td style="text-align:center;">~69년</td>
+                <td style="text-align:center;">32×32</td>
+                <td style="text-align:center;">4,096</td>
+              </tr>
+              <tr style="color:var(--text-secondary);">
+                <td style="padding:2px 4px;">장기 42-5-4-12</td>
+                <td style="text-align:center;">~139년</td>
+                <td style="text-align:center;">32×16</td>
+                <td style="text-align:center;">4,096</td>
+              </tr>
+              <tr style="color:var(--text-secondary);">
+                <td style="padding:2px 4px;">고동시 41-4-4-14</td>
+                <td style="text-align:center;">~69년</td>
+                <td style="text-align:center;">16×16</td>
+                <td style="text-align:center;">16,384</td>
+              </tr>
+            </table>
+          </div>
+          <div class="s11-consider-card s11-consider-card--green">
+            <div class="s11-consider-emoji">🛡️</div>
+            <div class="s11-consider-title">고가용성 &amp; ID 충돌 방지</div>
+            <p class="s11-consider-item">ID 생성기는 mission-critical 시스템</p>
+            <p class="s11-consider-item">다중 서버 + 로드 밸런싱으로 요청 분산</p>
+            <p class="s11-consider-item" style="color:var(--red);font-weight:700;">⚠ DC/Machine ID 변경 시 ID 충돌 위험</p>
+            <p class="s11-consider-item" style="font-size:0.75rem;color:var(--text-muted);">DC/Machine ID는 시작 시 고정, 변경 시 반드시 사전 검토 필요</p>
+          </div>
+        </div>
+
+        <!-- Real-world companies -->
+        <div class="s11-companies-section">
+          <div class="s11-companies-label">실제 활용 사례 <span style="font-size:0.65rem;color:#94a3b8;font-weight:400;">(책에는 Twitter만 언급)</span></div>
+          <div class="s11-companies-grid">
+            <div class="s11-company-card s11-company-card--blue">
+              <div class="s11-company-name">Twitter</div>
+              <div class="s11-company-desc">원조 Snowflake 개발</div>
+            </div>
+            <div class="s11-company-card s11-company-card--purple">
+              <div class="s11-company-name">Discord</div>
+              <div class="s11-company-desc">Snowflake 변형 사용</div>
+            </div>
+            <div class="s11-company-card s11-company-card--orange">
+              <div class="s11-company-name">Instagram</div>
+              <div class="s11-company-desc">유사 ID 시스템 채택</div>
+            </div>
+            <div class="s11-company-card s11-company-card--dark">
+              <div class="s11-company-name">Uber</div>
+              <div class="s11-company-desc">변형 활용</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Slide 14: 핵심 인사이트 & Q&A -->
+    <section class="slide" id="slide-14">
+      <div class="s12-inner">
+        <h2 class="slide-title s12-title">핵심 인사이트 &amp; 토론</h2>
+
+        <!-- 3 principle cards with solid backgrounds -->
+        <div class="s12-principles">
+          <div class="s12-principle-card s12-principle-card--blue">
+            <div class="s12-principle-emoji">⚖️</div>
+            <div class="s12-principle-title">Trade-off 분석</div>
+            <div class="s12-principle-desc">각 방법마다 고유한 장단점<br>요구사항에 맞는 최적해 선택</div>
+            <div style="font-size:0.68rem;color:#94a3b8;margin-top:6px;">면접 팁: "정답은 없다, 요구사항에 따라 다르다"</div>
+          </div>
+          <div class="s12-principle-card s12-principle-card--green">
+            <div class="s12-principle-emoji">🧩</div>
+            <div class="s12-principle-title">분할 정복</div>
+            <div class="s12-principle-desc">복잡한 문제를 작은 부분으로<br>Snowflake의 64비트 분할 전략</div>
+            <div style="font-size:0.68rem;color:#94a3b8;margin-top:6px;">면접 팁: 큰 문제를 섹션으로 나눠 설명하면 구조적 사고력을 보여줄 수 있다</div>
+          </div>
+          <div class="s12-principle-card s12-principle-card--purple">
+            <div class="s12-principle-emoji">📈</div>
+            <div class="s12-principle-title">확장성 vs 복잡성</div>
+            <div class="s12-principle-desc">단순한 해법은 확장성 제한<br>Snowflake는 복잡하지만 높은 확장성</div>
+            <div style="font-size:0.68rem;color:#94a3b8;margin-top:6px;">면접 팁: 단순한 방법부터 제시하고 한계를 설명한 뒤 개선안으로 넘어가라</div>
+          </div>
+        </div>
+
+        <!-- Discussion questions -->
+        <div class="s12-discussion" role="region" aria-label="토론 질문">
+          <div class="s12-discussion-title">💬 토론 질문</div>
+          <ol class="s12-questions" aria-label="토론 질문 목록">
+            <li class="s12-question-item">
+              <span class="s12-question-num" aria-hidden="true">1</span>
+              <span class="s12-question-text">시계가 역행하면 어떻게 될까?</span>
+            </li>
+            <li class="s12-question-item">
+              <span class="s12-question-num" aria-hidden="true">2</span>
+              <span class="s12-question-text">41비트 타임스탬프가 부족해지면?</span>
+            </li>
+            <li class="s12-question-item">
+              <span class="s12-question-num" aria-hidden="true">3</span>
+              <span class="s12-question-text">데이터센터/머신 ID는 어떻게 할당?</span>
+            </li>
+            <li class="s12-question-item">
+              <span class="s12-question-num" aria-hidden="true">4</span>
+              <span class="s12-question-text">ID의 보안은 어떻게 보장할 수 있을까?</span>
+            </li>
+          </ol>
+        </div>
+
+        <p class="s12-footer">감사합니다</p>
+      </div>
+    </section>
+
+  </div><!-- /.slides-container -->
+
+  <!-- Navigation: dot indicators -->
+  <nav id="nav-dots" aria-label="슬라이드 네비게이션">
+    <!-- Dots injected by JS -->
+  </nav>
+
+  <!-- Navigation: slide number -->
+  <div id="slide-number" aria-live="polite">1 / 14</div>
+
+  <script>
+    /* ─── State ──────────────────────────────────────────────────────── */
+    let currentSlide = 0;
+    const totalSlides = 14;
+
+    /* ─── DOM refs ───────────────────────────────────────────────────── */
+    const container   = document.getElementById('slides-container');
+    const dotsNav     = document.getElementById('nav-dots');
+    const slideNumber = document.getElementById('slide-number');
+    const zonePrev    = document.getElementById('zone-prev');
+    const zoneNext    = document.getElementById('zone-next');
+
+    /* ─── Build dot indicators ───────────────────────────────────────── */
+    for (let i = 0; i < totalSlides; i++) {
+      const dot = document.createElement('button');
+      dot.className = 'nav-dot' + (i === 0 ? ' active' : '');
+      dot.setAttribute('aria-label', `슬라이드 ${i + 1}로 이동`);
+      dot.addEventListener('click', () => goToSlide(i));
+      dotsNav.appendChild(dot);
+    }
+
+    /* ─── Core navigation ────────────────────────────────────────────── */
+    function goToSlide(n) {
+      // Clamp to valid range
+      n = Math.max(0, Math.min(totalSlides - 1, n));
+      const prev = currentSlide;
+      currentSlide = n;
+
+      // Apply horizontal translation
+      container.style.transform = `translateX(-${n * 100}vw)`;
+
+      // Update dots
+      const dots = dotsNav.querySelectorAll('.nav-dot');
+      dots.forEach((dot, i) => {
+        dot.classList.toggle('active', i === n);
+      });
+
+      // Update slide number label
+      slideNumber.textContent = `${n + 1} / ${totalSlides}`;
+
+      // Animation lifecycle: stop previous, start current
+      if (prev === 5) stopS5Anim();
+      if (prev === 7) stopS7Anim();
+      if (prev === 9) stopS9Anim();
+      if (prev === 10) stopS10Anim();
+      if (n === 5) startS5Anim();
+      if (n === 7) startS7Anim();
+      if (n === 9) startS9Anim();
+      if (n === 10) startS10Anim();
+    }
+
+    function nextSlide() {
+      goToSlide(currentSlide + 1);
+    }
+
+    function prevSlide() {
+      goToSlide(currentSlide - 1);
+    }
+
+    /* ─── Keyboard navigation ────────────────────────────────────────── */
+    document.addEventListener('keydown', (e) => {
+      switch (e.key) {
+        case 'ArrowRight':
+        case 'ArrowDown':
+        case ' ':
+          e.preventDefault();
+          nextSlide();
+          break;
+        case 'ArrowLeft':
+        case 'ArrowUp':
+          e.preventDefault();
+          prevSlide();
+          break;
+      }
+    });
+
+    /* ─── Click zone navigation ──────────────────────────────────────── */
+    zonePrev.addEventListener('click', prevSlide);
+    zoneNext.addEventListener('click', nextSlide);
+
+    /* ═══════════════════════════════════════════════════════════════════
+       SLIDE 5 ANIMATION — Multi-master alternating ID generation
+       ═══════════════════════════════════════════════════════════════════ */
+    let s5Timer = null;
+    let s5Step  = 0;
+    const S5_IDS      = [1, 2, 3, 4, 5, 6, 7, 8];
+    const S5_INTERVAL = 700;   // ms between each ID pop
+    const S5_PAUSE    = 1800;  // ms pause before loop restart
+
+    function startS5Anim() {
+      stopS5Anim();
+      s5Step = 0;
+      const track = document.getElementById('s5-id-track');
+      if (!track) return;
+      track.innerHTML = '';
+      s5Timer = setInterval(s5Tick, S5_INTERVAL);
+      s5Tick(); // fire first step immediately
+    }
+
+    function s5Tick() {
+      const track   = document.getElementById('s5-id-track');
+      const server1 = document.getElementById('s5-server1');
+      const server2 = document.getElementById('s5-server2');
+      if (!track || !server1 || !server2) return;
+
+      if (s5Step >= S5_IDS.length) {
+        // Pause then restart
+        clearInterval(s5Timer);
+        s5Timer = setTimeout(() => {
+          track.innerHTML = '';
+          s5Step = 0;
+          s5Timer = setInterval(s5Tick, S5_INTERVAL);
+          s5Tick();
+        }, S5_PAUSE);
+        return;
+      }
+
+      const num    = S5_IDS[s5Step];
+      const isOdd  = num % 2 !== 0;
+
+      // Pulse the active server
+      const srv = isOdd ? server1 : server2;
+      srv.classList.remove('s5-pulse-odd', 's5-pulse-even');
+      // Force reflow to restart animation
+      void srv.offsetWidth;
+      srv.classList.add(isOdd ? 's5-pulse-odd' : 's5-pulse-even');
+      srv.addEventListener('animationend', () => {
+        srv.classList.remove('s5-pulse-odd', 's5-pulse-even');
+      }, { once: true });
+
+      // Create the chip
+      const chip = document.createElement('div');
+      chip.className = 's5-id-chip ' + (isOdd ? 's5-chip--odd' : 's5-chip--even');
+      chip.textContent = num;
+      track.appendChild(chip);
+
+      // Trigger pop animation on next frame
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          chip.classList.add('s5-chip-pop');
+        });
+      });
+
+      s5Step++;
+    }
+
+    function stopS5Anim() {
+      if (s5Timer !== null) {
+        clearInterval(s5Timer);
+        clearTimeout(s5Timer);
+        s5Timer = null;
+      }
+      // Clean up pulse classes
+      const s1 = document.getElementById('s5-server1');
+      const s2 = document.getElementById('s5-server2');
+      if (s1) s1.classList.remove('s5-pulse-odd', 's5-pulse-even');
+      if (s2) s2.classList.remove('s5-pulse-odd', 's5-pulse-even');
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════
+       SLIDE 7 ANIMATION — Ticket Server request flow + SPOF cycle
+       ═══════════════════════════════════════════════════════════════════ */
+    let s7Timer      = null;
+    let s7Phase      = 'normal'; // 'normal' | 'down' | 'recover'
+    let s7IdCounter  = 1;
+    let s7ReqIndex   = 0;        // which web server fires next (0,1,2 cycling)
+    const S7_REQ_INTERVAL  = 900;   // ms between requests in normal phase
+    const S7_NORMAL_ROUNDS = 6;     // requests before SPOF demo
+    let s7RoundCount = 0;
+
+    function startS7Anim() {
+      stopS7Anim();
+      s7Phase      = 'normal';
+      s7IdCounter  = 1;
+      s7ReqIndex   = 0;
+      s7RoundCount = 0;
+
+      // Start SPOF badge pulsing
+      const badge = document.getElementById('s7-spof-badge');
+      if (badge) badge.classList.add('s7-spof-pulse');
+
+      // Restore ticket box state
+      const tbox = document.getElementById('s7-ticket-box');
+      if (tbox) {
+        tbox.classList.remove('s7-down', 's7-recovering');
+        tbox.style.background   = '';
+        tbox.style.borderColor  = '';
+      }
+      // Clear web box error states
+      ['s7-web1','s7-web2','s7-web3'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.remove('s7-error');
+      });
+
+      s7Timer = setInterval(s7Tick, S7_REQ_INTERVAL);
+    }
+
+    function s7Tick() {
+      if (s7Phase === 'normal') {
+        s7FireRequest();
+        s7RoundCount++;
+        if (s7RoundCount >= S7_NORMAL_ROUNDS) {
+          clearInterval(s7Timer);
+          s7Timer = null;
+          // Short delay, then trigger SPOF
+          s7Timer = setTimeout(s7TriggerSPOF, 400);
+        }
+      }
+    }
+
+    function s7FireRequest() {
+      const webIds    = ['s7-web1', 's7-web2', 's7-web3'];
+      const webId     = webIds[s7ReqIndex % 3];
+      const dotColor  = ['#2563eb', '#16a34a', '#7c3aed'][s7ReqIndex % 3];
+      s7ReqIndex++;
+
+      const diagram   = document.getElementById('s7-diagram');
+      const webEl     = document.getElementById(webId);
+      const ticketEl  = document.getElementById('s7-ticket-box');
+      if (!diagram || !webEl || !ticketEl) return;
+
+      const diagRect   = diagram.getBoundingClientRect();
+      const webRect    = webEl.getBoundingClientRect();
+      const tickRect   = ticketEl.getBoundingClientRect();
+
+      // Start position: center-bottom of web box (relative to diagram)
+      const startX = webRect.left + webRect.width  / 2 - diagRect.left - 6;
+      const startY = webRect.top  + webRect.height     - diagRect.top  - 6;
+
+      // End position: center-top of ticket box (relative to diagram)
+      const endX   = tickRect.left + tickRect.width  / 2 - diagRect.left - 6;
+      const endY   = tickRect.top                        - diagRect.top  - 6;
+
+      const travelDur = 380; // ms
+
+      // Create request dot
+      const dot = document.createElement('div');
+      dot.className = 's7-req-dot';
+      dot.style.cssText = `
+        left: ${startX}px;
+        top:  ${startY}px;
+        background: ${dotColor};
+        opacity: 1;
+        transition: transform ${travelDur}ms cubic-bezier(0.4,0,0.2,1), opacity 120ms ease;
+      `;
+      diagram.style.position = 'relative';
+      diagram.appendChild(dot);
+
+      // Animate travel
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          dot.style.transform = `translate(${endX - startX}px, ${endY - startY}px)`;
+        });
+      });
+
+      // On arrival: glow ticket server, send ID back
+      setTimeout(() => {
+        dot.style.opacity = '0';
+        setTimeout(() => dot.remove(), 120);
+
+        const tbox = document.getElementById('s7-ticket-box');
+        if (tbox && s7Phase === 'normal') {
+          tbox.classList.remove('s7-glow');
+          void tbox.offsetWidth;
+          tbox.classList.add('s7-glow');
+          tbox.addEventListener('animationend', () => tbox.classList.remove('s7-glow'), { once: true });
+        }
+
+        // Fire return ID badge after brief pause
+        setTimeout(() => {
+          if (s7Phase === 'normal') {
+            s7FireReturn(diagram, diagRect, tickRect, webRect, dotColor);
+          }
+        }, 120);
+
+      }, travelDur);
+    }
+
+    function s7FireReturn(diagram, diagRect, tickRect, webRect, color) {
+      const idVal = s7IdCounter++;
+
+      // Recalculate positions fresh (layout may have shifted slightly)
+      const dRect = diagram.getBoundingClientRect();
+      const tRect = document.getElementById('s7-ticket-box')
+                      ? document.getElementById('s7-ticket-box').getBoundingClientRect()
+                      : tickRect;
+
+      const startX = tRect.left  + tRect.width  / 2 - dRect.left;
+      const startY = tRect.top                       - dRect.top - 14;
+      const endX   = webRect.left + webRect.width / 2 - dRect.left;
+      const endY   = webRect.top  + webRect.height / 2 - dRect.top;
+
+      const badge = document.createElement('div');
+      badge.className = 's7-return-id';
+      badge.textContent = `ID: ${idVal}`;
+      badge.style.cssText = `
+        left: ${startX}px;
+        top:  ${startY}px;
+        background: ${color};
+        opacity: 1;
+        transition: transform 360ms cubic-bezier(0.4,0,0.2,1), opacity 200ms ease;
+      `;
+      diagram.appendChild(badge);
+
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          badge.style.transform = `translate(${endX - startX}px, ${endY - startY}px)`;
+        });
+      });
+
+      setTimeout(() => {
+        badge.style.opacity = '0';
+        setTimeout(() => badge.remove(), 220);
+      }, 360);
+    }
+
+    function s7TriggerSPOF() {
+      s7Phase = 'down';
+      const tbox  = document.getElementById('s7-ticket-box');
+      const badge = document.getElementById('s7-spof-badge');
+      if (!tbox) return;
+
+      tbox.classList.add('s7-down');
+
+      // Show error on all web boxes
+      ['s7-web1','s7-web2','s7-web3'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.add('s7-error');
+      });
+
+      // Intensify SPOF badge
+      if (badge) {
+        badge.style.animation = 'none';
+        void badge.offsetWidth;
+        badge.style.animation = 's7SpofPulse 0.6s ease-in-out infinite';
+      }
+
+      // After 2.2s, recover
+      s7Timer = setTimeout(s7RecoverFromSPOF, 2200);
+    }
+
+    function s7RecoverFromSPOF() {
+      s7Phase = 'recover';
+      const tbox  = document.getElementById('s7-ticket-box');
+      const badge = document.getElementById('s7-spof-badge');
+
+      if (tbox) {
+        tbox.classList.remove('s7-down');
+        tbox.classList.add('s7-recovering');
+        tbox.addEventListener('animationend', () => {
+          tbox.classList.remove('s7-recovering');
+          tbox.style.background  = '';
+          tbox.style.borderColor = '';
+        }, { once: true });
+      }
+
+      // Clear error states
+      ['s7-web1','s7-web2','s7-web3'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.remove('s7-error');
+      });
+
+      // Restore normal SPOF badge pulse
+      if (badge) {
+        badge.style.animation = '';
+        badge.classList.remove('s7-spof-pulse');
+        void badge.offsetWidth;
+        badge.classList.add('s7-spof-pulse');
+      }
+
+      // Restart normal cycle after brief pause
+      s7Timer = setTimeout(() => {
+        s7Phase      = 'normal';
+        s7RoundCount = 0;
+        s7Timer = setInterval(s7Tick, S7_REQ_INTERVAL);
+      }, 600);
+    }
+
+    function stopS7Anim() {
+      if (s7Timer !== null) {
+        clearInterval(s7Timer);
+        clearTimeout(s7Timer);
+        s7Timer = null;
+      }
+      // Clean up badge pulse
+      const badge = document.getElementById('s7-spof-badge');
+      if (badge) {
+        badge.classList.remove('s7-spof-pulse');
+        badge.style.animation = '';
+      }
+      // Clean up ticket box states
+      const tbox = document.getElementById('s7-ticket-box');
+      if (tbox) {
+        tbox.classList.remove('s7-down', 's7-glow', 's7-recovering');
+        tbox.style.background  = '';
+        tbox.style.borderColor = '';
+      }
+      // Clean up web box errors
+      ['s7-web1','s7-web2','s7-web3'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.remove('s7-error');
+      });
+      // Remove any stray animated elements
+      const diagram = document.getElementById('s7-diagram');
+      if (diagram) {
+        diagram.querySelectorAll('.s7-req-dot, .s7-return-id').forEach(el => el.remove());
+      }
+    }
+
+    /* ─── Slide 9: 64비트 구조 Assembly Animation ────────────────────── */
+    let s9Timers = [];
+
+    function startS9Anim() {
+      stopS9Anim();
+
+      const segs   = document.querySelectorAll('#slide-10 .s9-seg');
+      const labels = document.querySelectorAll('#slide-10 .s9-label-cell');
+      const cards  = document.querySelectorAll('#slide-10 .s9-spec-card');
+      const bar    = document.querySelector('#slide-10 .s9-bit-bar');
+
+      // Reset to hidden
+      segs.forEach(el => {
+        el.classList.remove('s9-seg--reveal');
+        el.classList.add('s9-seg--hidden');
+      });
+      labels.forEach(el => {
+        el.classList.remove('s9-label--reveal');
+        el.classList.add('s9-label--hidden');
+      });
+      cards.forEach(el => {
+        el.classList.remove('s9-card--reveal');
+        el.classList.add('s9-card--hidden');
+      });
+      if (bar) bar.classList.remove('s9-bar--glow');
+
+      // Reveal schedule: [segIndex, delay]
+      const segDelays   = [0, 400, 800, 1100, 1400];
+      const cardDelays  = [2000, 2180, 2360, 2540];
+
+      segDelays.forEach((delay, i) => {
+        const t = setTimeout(() => {
+          if (segs[i]) {
+            segs[i].classList.remove('s9-seg--hidden');
+            segs[i].classList.add('s9-seg--reveal');
+          }
+          if (labels[i]) {
+            labels[i].classList.remove('s9-label--hidden');
+            labels[i].classList.add('s9-label--reveal');
+          }
+        }, delay);
+        s9Timers.push(t);
+      });
+
+      cardDelays.forEach((delay, i) => {
+        const t = setTimeout(() => {
+          if (cards[i]) {
+            cards[i].classList.remove('s9-card--hidden');
+            cards[i].classList.add('s9-card--reveal');
+          }
+        }, delay);
+        s9Timers.push(t);
+      });
+
+      // Bar glow after all segments visible
+      const glowT = setTimeout(() => {
+        if (bar) {
+          bar.classList.remove('s9-bar--glow');
+          // Force reflow to restart animation
+          void bar.offsetWidth;
+          bar.classList.add('s9-bar--glow');
+        }
+      }, 1900);
+      s9Timers.push(glowT);
+    }
+
+    function stopS9Anim() {
+      s9Timers.forEach(t => { clearTimeout(t); clearInterval(t); });
+      s9Timers = [];
+
+      const segs   = document.querySelectorAll('#slide-10 .s9-seg');
+      const labels = document.querySelectorAll('#slide-10 .s9-label-cell');
+      const cards  = document.querySelectorAll('#slide-10 .s9-spec-card');
+      const bar    = document.querySelector('#slide-10 .s9-bit-bar');
+
+      segs.forEach(el => {
+        el.classList.remove('s9-seg--reveal', 's9-seg--hidden');
+        el.style.animation = '';
+      });
+      labels.forEach(el => {
+        el.classList.remove('s9-label--reveal', 's9-label--hidden');
+        el.style.animation = '';
+      });
+      cards.forEach(el => {
+        el.classList.remove('s9-card--reveal', 's9-card--hidden');
+        el.style.animation = '';
+      });
+      if (bar) bar.classList.remove('s9-bar--glow');
+    }
+
+    /* ─── Slide 10: ID 생성 Animation ────────────────────────────────── */
+    let s10Timers     = [];
+    let s10Counter    = null;
+    let s10CountVal   = 0;
+    let s10LoopTimer  = null;
+
+    function startS10Anim() {
+      stopS10Anim();
+      s10RunSequence();
+    }
+
+    function s10RunSequence() {
+      const steps  = [1,2,3,4].map(n => document.getElementById('s10-step-' + n));
+      const arrows = [1,2,3].map(n => document.getElementById('s10-arrow-' + n));
+      const counterEl = document.getElementById('s10-counter');
+      const stat1  = document.getElementById('s10-stat-1');
+      const stat2  = document.getElementById('s10-stat-2');
+      const lines  = [1,2,3,4].map(n => document.getElementById('s10-line-' + n));
+
+      // Phase 1 reset: dim all steps
+      steps.forEach(el => {
+        if (!el) return;
+        el.classList.remove('s10-step--active');
+        el.classList.add('s10-step--dim');
+      });
+      arrows.forEach(el => {
+        if (el) el.classList.remove('s10-arrow--glow');
+      });
+      if (counterEl) {
+        counterEl.classList.remove('s10-counter--visible');
+        counterEl.textContent = '0';
+      }
+      s10CountVal = 0;
+      if (stat1) stat1.classList.remove('s10-stat--pulse');
+      if (stat2) stat2.classList.remove('s10-stat--pulse');
+      lines.forEach(el => { if (el) el.classList.remove('s10-line--highlight'); });
+
+      // Step light-up schedule
+      // step 1 → 0ms, arrow1 → 300ms, step2 → 500ms, arrow2 → 800ms,
+      // step3 → 1000ms, arrow3 → 1300ms, step4 → 1500ms
+      const stepSchedule = [
+        { type: 'step',  el: steps[0],  delay: 0 },
+        { type: 'arrow', el: arrows[0], delay: 320 },
+        { type: 'step',  el: steps[1],  delay: 520 },
+        { type: 'arrow', el: arrows[1], delay: 840 },
+        { type: 'step',  el: steps[2],  delay: 1040 },
+        { type: 'arrow', el: arrows[2], delay: 1360 },
+        { type: 'step',  el: steps[3],  delay: 1560 },
+      ];
+
+      stepSchedule.forEach(({ type, el, delay }) => {
+        const t = setTimeout(() => {
+          if (!el) return;
+          if (type === 'step') {
+            el.classList.remove('s10-step--dim');
+            el.classList.add('s10-step--active');
+            // Remove active class after animation so it can re-trigger
+            setTimeout(() => el && el.classList.remove('s10-step--active'), 600);
+          } else {
+            el.classList.remove('s10-arrow--glow');
+            void el.offsetWidth;
+            el.classList.add('s10-arrow--glow');
+          }
+        }, delay);
+        s10Timers.push(t);
+      });
+
+      // Phase 2: live counter starts at 2100ms
+      const counterStart = setTimeout(() => {
+        if (!counterEl) return;
+        counterEl.classList.add('s10-counter--visible');
+
+        // Ramp up speed in 3 stages
+        let stage = 0;
+        const stageSpeeds = [80, 30, 12];
+        const stageIDs    = [4096, 409600, 4090000];
+
+        function runStage(s) {
+          if (stage !== s) return;
+          s10Counter = setInterval(() => {
+            s10CountVal += (s === 0 ? 17 : s === 1 ? 512 : 4096);
+            if (counterEl) {
+              counterEl.textContent = s10CountVal.toLocaleString('ko-KR');
+            }
+            // Pulse stat cards at milestones
+            if (s10CountVal >= 4096 && s10CountVal < 4096 + 50 && stat1) {
+              stat1.classList.remove('s10-stat--pulse');
+              void stat1.offsetWidth;
+              stat1.classList.add('s10-stat--pulse');
+            }
+            if (s10CountVal >= 409600 && s10CountVal < 409600 + 600 && stat2) {
+              stat2.classList.remove('s10-stat--pulse');
+              void stat2.offsetWidth;
+              stat2.classList.add('s10-stat--pulse');
+            }
+            // Advance stage when threshold crossed
+            if (s10CountVal >= stageIDs[s]) {
+              clearInterval(s10Counter);
+              s10Counter = null;
+              stage++;
+              if (stage < stageSpeeds.length) {
+                const nextT = setTimeout(() => runStage(stage), 200);
+                s10Timers.push(nextT);
+              }
+            }
+          }, stageSpeeds[s]);
+        }
+        runStage(0);
+      }, 2100);
+      s10Timers.push(counterStart);
+
+      // Phase 3: code line highlights at 6200ms
+      const codeStart = 6200;
+      lines.forEach((el, i) => {
+        const onT = setTimeout(() => {
+          lines.forEach(l => { if (l) l.classList.remove('s10-line--highlight'); });
+          if (el) el.classList.add('s10-line--highlight');
+        }, codeStart + i * 500);
+        s10Timers.push(onT);
+
+        const offT = setTimeout(() => {
+          if (el) el.classList.remove('s10-line--highlight');
+        }, codeStart + i * 500 + 420);
+        s10Timers.push(offT);
+      });
+
+      // Loop: restart after pause
+      s10LoopTimer = setTimeout(() => {
+        s10RunSequence();
+      }, codeStart + lines.length * 500 + 1400);
+      s10Timers.push(s10LoopTimer);
+    }
+
+    function stopS10Anim() {
+      s10Timers.forEach(t => { clearTimeout(t); clearInterval(t); });
+      s10Timers = [];
+      if (s10Counter !== null) { clearInterval(s10Counter); s10Counter = null; }
+      s10LoopTimer = null;
+
+      // Reset step states
+      [1,2,3,4].forEach(n => {
+        const el = document.getElementById('s10-step-' + n);
+        if (el) el.classList.remove('s10-step--dim', 's10-step--active');
+      });
+      [1,2,3].forEach(n => {
+        const el = document.getElementById('s10-arrow-' + n);
+        if (el) el.classList.remove('s10-arrow--glow');
+      });
+      const counterEl = document.getElementById('s10-counter');
+      if (counterEl) {
+        counterEl.classList.remove('s10-counter--visible');
+        counterEl.textContent = '0';
+      }
+      const stat1 = document.getElementById('s10-stat-1');
+      const stat2 = document.getElementById('s10-stat-2');
+      if (stat1) stat1.classList.remove('s10-stat--pulse');
+      if (stat2) stat2.classList.remove('s10-stat--pulse');
+      [1,2,3,4].forEach(n => {
+        const el = document.getElementById('s10-line-' + n);
+        if (el) el.classList.remove('s10-line--highlight');
+      });
+    }
+
+    /* ─── Touch / swipe navigation ───────────────────────────────────── */
+    let touchStartX = null;
+    let touchStartY = null;
+
+    document.addEventListener('touchstart', (e) => {
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+    }, { passive: true });
+
+    document.addEventListener('touchend', (e) => {
+      if (touchStartX === null) return;
+
+      const dx = e.changedTouches[0].clientX - touchStartX;
+      const dy = e.changedTouches[0].clientY - touchStartY;
+
+      // Only act on primarily horizontal swipes (|dx| > |dy| and > 40px)
+      if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 40) {
+        if (dx < 0) {
+          nextSlide(); // swipe left → next
+        } else {
+          prevSlide(); // swipe right → prev
+        }
+      }
+
+      touchStartX = null;
+      touchStartY = null;
+    }, { passive: true });
+  </script>
+</body>
+</html>
