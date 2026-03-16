@@ -46,7 +46,7 @@ System design interviews are the most difficult to tackle of all technical inter
 
 ### Chapter 6: Design a Key-Value Store
 
-- Presenter: TBA [[Discussion]](./02%20-%20Discussion/260314%20-%20System%20Design%20Interview%20–%20An%20Insider's%20Guide,%20Chapter%206,%207.md)
+- Presenter: Juho Moon [[Summary]](./01%20-%20Summary/260314%20-%20System%20Design%20Interview%20–%20An%20Insider's%20Guide,%20Chapter%206.pdf) [[Discussion]](./02%20-%20Discussion/260314%20-%20System%20Design%20Interview%20–%20An%20Insider's%20Guide,%20Chapter%206,%207.md)
 
 ### Chapter 7: Design a Unique ID Generator in Distributed Systems
 
