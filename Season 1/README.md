@@ -54,11 +54,11 @@ System design interviews are the most difficult to tackle of all technical inter
 
 ### Chapter 8: Design a URL Shortener
 
-- Presenter: Chris Ohk [[Summary]](./01%20-%20Summary/260328%20-%20System%20Design%20Interview%20–%20An%20Insider's%20Guide,%20Chapter%208.md)
+- Presenter: Chris Ohk [[Summary]](./01%20-%20Summary/260328%20-%20System%20Design%20Interview%20–%20An%20Insider's%20Guide,%20Chapter%208.md) [[Discussion]](./02%20-%20Discussion/260328%20-%20System%20Design%20Interview%20–%20An%20Insider's%20Guide,%20Chapter%208,%209.md)
 
 ### Chapter 9: Design a Web Crawler
 
-- Presenter: Hyunwoo Jang [[Summary]](./01%20-%20Summary/260328%20-%20System%20Design%20Interview%20–%20An%20Insider's%20Guide,%20Chapter%209.pdf)
+- Presenter: Hyunwoo Jang [[Summary]](./01%20-%20Summary/260328%20-%20System%20Design%20Interview%20–%20An%20Insider's%20Guide,%20Chapter%209.pdf) [[Discussion]](./02%20-%20Discussion/260328%20-%20System%20Design%20Interview%20–%20An%20Insider's%20Guide,%20Chapter%208,%209.md)
 
 ### Chapter 10: Design a Notification System
 
