@@ -58,7 +58,7 @@ System design interviews are the most difficult to tackle of all technical inter
 
 ### Chapter 9: Design a Web Crawler
 
-- Presenter: TBA
+- Presenter: Hyunwoo Jang [[Summary]](./01%20-%20Summary/260328%20-%20System%20Design%20Interview%20–%20An%20Insider's%20Guide,%20Chapter%209.pdf)
 
 ### Chapter 10: Design a Notification System
 
