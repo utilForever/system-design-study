@@ -62,11 +62,11 @@ System design interviews are the most difficult to tackle of all technical inter
 
 ### Chapter 10: Design a Notification System
 
-- Presenter: Chankyu Shin [[Summary]](./01%20-%20Summary/260425%20-%20System%20Design%20Interview%20–%20An%20Insider's%20Guide,%20Chapter%2010.pdf)
+- Presenter: Chankyu Shin [[Summary]](./01%20-%20Summary/260425%20-%20System%20Design%20Interview%20–%20An%20Insider's%20Guide,%20Chapter%2010.pdf) [[Disscussion]](./02%20-%20Discussion/260425%20-%20System%20Design%20Interview%20–%20An%20Insider's%20Guide,%20Chapter%2010,%2011.md)
 
 ### Chapter 11: Design a News Feed System
 
-- Presenter: TBA
+- Presenter: Taeyoung Yoo [[Disscussion]](./02%20-%20Discussion/260425%20-%20System%20Design%20Interview%20–%20An%20Insider's%20Guide,%20Chapter%2010,%2011.md)
 
 ### Chapter 12: Design a Chat System
 
