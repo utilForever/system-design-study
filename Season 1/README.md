@@ -70,7 +70,7 @@ System design interviews are the most difficult to tackle of all technical inter
 
 ### Chapter 12: Design a Chat System
 
-- Presenter: TBA
+- Presenter: Donghyeon Yeo [[Summary]](./01%20-%20Summary/260509%20-%20System%20Design%20Interview%20–%20An%20Insider's%20Guide,%20Chapter%2012.pdf)
 
 ### Chapter 13: Design a Search Autocomplete System
 
