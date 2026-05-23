@@ -86,4 +86,4 @@ System design interviews are the most difficult to tackle of all technical inter
 
 ### Chapter 16: The Learning Continues
 
-- Presenter: TBA
+- Presenter: Skipped.
