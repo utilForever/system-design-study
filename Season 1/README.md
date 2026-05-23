@@ -78,7 +78,7 @@ System design interviews are the most difficult to tackle of all technical inter
 
 ### Chapter 14: Design Youtube
 
-- Presenter: TBA
+- Presenter: Chris Ohk [[Summary]](./01%20-%20Summary/260523%20-%20System%20Design%20Interview%20–%20An%20Insider's%20Guide,%20Chapter%2014.pdf)
 
 ### Chapter 15: Design Google Drive
 
