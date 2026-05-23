@@ -78,11 +78,11 @@ System design interviews are the most difficult to tackle of all technical inter
 
 ### Chapter 14: Design Youtube
 
-- Presenter: Chris Ohk [[Summary]](./01%20-%20Summary/260523%20-%20System%20Design%20Interview%20–%20An%20Insider's%20Guide,%20Chapter%2014.pdf)
+- Presenter: Chris Ohk [[Summary]](./01%20-%20Summary/260523%20-%20System%20Design%20Interview%20–%20An%20Insider's%20Guide,%20Chapter%2014.pdf) [[Discussion]](./02%20-%20Discussion/260523%20-%20System%20Design%20Interview%20–%20An%20Insider's%20Guide,%20Chapter%2014,%2015.md)
 
 ### Chapter 15: Design Google Drive
 
-- Presenter: Seungrok Lee [[Summary]](./01%20-%20Summary/260523%20-%20System%20Design%20Interview%20–%20An%20Insider's%20Guide,%20Chapter%2015.pdf)
+- Presenter: Seungrok Lee [[Summary]](./01%20-%20Summary/260523%20-%20System%20Design%20Interview%20–%20An%20Insider's%20Guide,%20Chapter%2015.pdf) [[Discussion]](./02%20-%20Discussion/260523%20-%20System%20Design%20Interview%20–%20An%20Insider's%20Guide,%20Chapter%2014,%2015.md)
 
 ### Chapter 16: The Learning Continues
 
