@@ -35,7 +35,7 @@ What’s inside?
 
 ### Chapter 1: Proximity Service
 
-- Presenter: Chris Ohk [[Summary]](./01%20-%20Summary/260627%20-%20System%20Design%20Interview%20–%20An%20Insider's%20Guide,%20Volume%202,%20Chapter%201.pdf)
+- Presenter: Chris Ohk [[Summary]](./01%20-%20Summary/260627%20-%20System%20Design%20Interview%20–%20An%20Insider's%20Guide,%20Volume%202,%20Chapter%201.pdf) [[Discussion]](./02%20-%20Discussion/260627%20-%20System%20Design%20Interview%20–%20An%20Insider's%20Guide,%20Volume%202,%20Chapter%201.md)
 
 ### Chapter 2: Nearby Friends
 
