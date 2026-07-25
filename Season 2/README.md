@@ -43,7 +43,7 @@ What’s inside?
 
 ### Chapter 3: Google Maps
 
-- Presenter: Yuhan Park [[Summary]](./01%20-%20Summary/260725%20-%20System%20Design%20Interview%20–%20An%20Insider's%20Guide,%20Volume%202,%20Chapter%203.pdf)
+- Presenter: Yuhan Park [[Summary]](./01%20-%20Summary/260725%20-%20System%20Design%20Interview%20–%20An%20Insider's%20Guide,%20Volume%202,%20Chapter%203.pdf) [[Discussion]](./02%20-%20Discussion/260725%20-%20System%20Design%20Interview%20–%20An%20Insider's%20Guide,%20Volume%202,%20Chapter%203.md)
 
 ### Chapter 4: Distributed Message Queue
 
