@@ -47,7 +47,7 @@ What’s inside?
 
 ### Chapter 4: Distributed Message Queue
 
-- Presenter: Chris Ohk [[Summary]](./01%20-%20Summary/260808%20-%20System%20Design%20Interview%20–%20An%20Insider's%20Guide,%20Volume%202,%20Chapter%204.pdf)
+- Presenter: Chris Ohk [[Summary]](./01%20-%20Summary/260808%20-%20System%20Design%20Interview%20–%20An%20Insider's%20Guide,%20Volume%202,%20Chapter%204.pdf) [[Discussion]](./02%20-%20Discussion/260808%20-%20System%20Design%20Interview%20–%20An%20Insider's%20Guide,%20Volume%202,%20Chapter%204.md)
 
 ### Chapter 5: Metrics Monitoring
 
