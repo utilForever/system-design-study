@@ -39,7 +39,7 @@ What’s inside?
 
 ### Chapter 2: Nearby Friends
 
-- Presenter: Seonghyun [[Discussion]](./02%20-%20Discussion/260711%20-%20System%20Design%20Interview%20–%20An%20Insider's%20Guide,%20Volume%202,%20Chapter%202.md)
+- Presenter: Seonghyun [[Summary]](./01%20-%20Summary/260711%20-%20System%20Design%20Interview%20–%20An%20Insider's%20Guide,%20Volume%202,%20Chapter%202.pdf) [[Discussion]](./02%20-%20Discussion/260711%20-%20System%20Design%20Interview%20–%20An%20Insider's%20Guide,%20Volume%202,%20Chapter%202.md)
 
 ### Chapter 3: Google Maps
 
