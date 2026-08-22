@@ -51,7 +51,7 @@ What’s inside?
 
 ### Chapter 5: Metrics Monitoring
 
-- Presenter: TBA
+- Presenter: Chris Ohk [[Summary]](./01%20-%20Summary/260822%20-%20System%20Design%20Interview%20–%20An%20Insider's%20Guide,%20Volume%202,%20Chapter%205.pdf)
 
 ### Chapter 6: Ad Click Event Aggregation
 
