@@ -25,7 +25,7 @@ What’s inside?
 - Yuhan Park
 - Yuseok Yang
 - Seonghyun
-- Hoyeon
+- Hoyeon Lee
 - Seungmin
 - Seojin
 
@@ -59,7 +59,7 @@ What’s inside?
 
 ### Chapter 7: Hotel Reservation
 
-- Presenter: TBA
+- Presenter: Hoyeon Lee [[Summary]](./01%20-%20Summary/260919%20-%20System%20Design%20Interview%20–%20An%20Insider's%20Guide,%20Volume%202,%20Chapter%207.pdf)
 
 ### Chapter 8: Distributed Email Service
 
