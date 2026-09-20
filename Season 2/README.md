@@ -59,7 +59,7 @@ What’s inside?
 
 ### Chapter 7: Hotel Reservation
 
-- Presenter: Hoyeon Lee [[Summary]](./01%20-%20Summary/260919%20-%20System%20Design%20Interview%20–%20An%20Insider's%20Guide,%20Volume%202,%20Chapter%207.pdf)
+- Presenter: Hoyeon Lee [[Summary]](./01%20-%20Summary/260919%20-%20System%20Design%20Interview%20–%20An%20Insider's%20Guide,%20Volume%202,%20Chapter%207.pdf) (Discussion is not available due to the recording issue)
 
 ### Chapter 8: Distributed Email Service
 
