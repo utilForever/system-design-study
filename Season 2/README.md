@@ -63,7 +63,7 @@ What’s inside?
 
 ### Chapter 8: Distributed Email Service
 
-- Presenter: TBA
+- Presenter: Yuseok Yang [[Summary]](./01%20-%20Summary/261010%20-%20System%20Design%20Interview%20–%20An%20Insider's%20Guide,%20Volume%202,%20Chapter%208.pdf)
 
 ### Chapter 9: S3-like Object Storage
 
